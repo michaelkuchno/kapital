@@ -101,6 +101,8 @@ async function main() {
   }
   if (shares.size) writeFileSync(join(OUT, 'shares', 'index.json'), JSON.stringify([...byIsin.values()].sort((a, b) => a.name.localeCompare(b.name))))
   log(`GPW: indices ${allIdx.size}, shares updated ${shares.size}`)
+  // save the progress right away: an interrupted run (restart, network) does not have to fetch the quotes again
+  writeFileSync(join(OUT, 'meta.json'), JSON.stringify({ ...meta, updatedAt: new Date().toISOString(), lastTradingDay: lastDay, errors }, null, 1))
 
   // 2. trend summary
   const summary = summarizeIndices(allIdx)
