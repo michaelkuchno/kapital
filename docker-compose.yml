@@ -1,0 +1,15 @@
+# docker compose up -d   →   http://localhost:8080 (on the phone: http://<this computer's IP>:8080)
+services:
+  kapital:
+    build: .
+    image: kapital:latest
+    container_name: kapital
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - kapital-data:/data
+    environment:
+      - FETCH_CRON=30 18 * * 1-5
+volumes:
+  kapital-data:

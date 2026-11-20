@@ -1,0 +1,40 @@
+name: CI
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['public/data/**']
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx tsc --noEmit -p .
+      - run: npx eslint .
+      - name: Unit tests with coverage thresholds (core + data ≥ 95 % lines)
+        run: npx vitest run --coverage
+      - run: npx vite build
+      - run: npx playwright install --with-deps chromium
+      - name: End-to-end tests (desktop, Android and iPhone sizes)
+        run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: playwright, path: test-results }
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the home-server image
+        run: docker build -t kapital:ci .
+      - name: Smoke test (health, app, data folder, encrypted vault only)
+        run: |
+          docker run -d --name k -p 8080:8080 -e FETCH_CRON="0 0 1 1 *" kapital:ci
+          for i in $(seq 1 30); do curl -sf localhost:8080/api/health && break; sleep 2; done
+          curl -sf localhost:8080/ | grep -q '<div id="root">'
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H 'content-type: application/json' -d '{"assets":[]}' localhost:8080/api/vault)" = 400
+          curl -sf -X PUT -H 'content-type: application/json' -d '{"v":1,"salt":"a","iv":"b","data":"c"}' localhost:8080/api/vault
+          curl -sf localhost:8080/api/vault | grep -q '"salt":"a"'
+          docker logs k | tail -20
