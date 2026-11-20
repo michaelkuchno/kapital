@@ -123,6 +123,23 @@ export function Settings() {
     <div className="space-y-4" data-testid="settings">
       <h1 className="text-2xl font-extrabold text-sea">{t('settings.title')}</h1>
       <People />
+      <Card title={t('country.title')} testId="country">
+        <p className="mb-3 text-sm text-stone-600">{t('country.hint')}</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={t('country.title')}>
+            <select className="input" value={settings.country} onChange={(e) => void update({ country: e.target.value as 'PL' | 'CH', displayCurrency: e.target.value === 'CH' ? 'CHF' : 'PLN' })} data-testid="s-country">
+              <option value="PL">{t('country.PL')}</option>
+              <option value="CH">{t('country.CH')}</option>
+            </select>
+          </Field>
+          <Field label={t('currency.title')}>
+            <select className="input" value={settings.displayCurrency} onChange={(e) => void update({ displayCurrency: e.target.value as 'PLN' | 'CHF' })} data-testid="s-currency">
+              <option value="PLN">PLN (zł)</option>
+              <option value="CHF">CHF (Fr.)</option>
+            </select>
+          </Field>
+        </div>
+      </Card>
       <Card>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t('settings.lang')}>
@@ -169,6 +186,7 @@ export function Settings() {
               ['family800', 'settings.family800'],
               ['usesIke', 'settings.ike'],
               ['usesIkze', 'settings.ikze'],
+              ['usesPillar3a', 'settings.pillar3a'],
             ] as const
           ).map(([k, label]) => (
             <label key={k} className="flex items-center gap-2">

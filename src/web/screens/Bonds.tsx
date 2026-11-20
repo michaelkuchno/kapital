@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useApp } from '../state'
-import { Card, Field, Money, Num, Pct } from '../components/ui'
+import { Card, Field, Num, Pct } from '../components/ui'
 import { BOND_SPECS, type BondCode } from '@core/bonds'
 import { compareBond, compareDeposit } from '@core/compare'
 import { latestCpi } from '@core/inflation'
-import { rate } from '../i18n'
+import { rate, money } from '../i18n'
 
 export function Bonds() {
   const { t, lang, market, settings, asOf } = useApp()
@@ -27,6 +27,11 @@ export function Bonds() {
   return (
     <div className="space-y-4" data-testid="bonds">
       <h1 className="text-2xl font-extrabold text-sea">{t('bonds.title')}</h1>
+      {settings.country === 'CH' && (
+        <p className="rounded-xl bg-amber-50 p-3 text-sm" data-testid="bonds-ch-note">
+          🇨🇭 {t('bonds.chNote')}
+        </p>
+      )}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="offer">
         {offer.map((o) => (
           <div key={o.code} className="card" data-testid={`offer-${o.code}`}>
@@ -43,7 +48,7 @@ export function Bonds() {
       {market?.offerMonth && <p className="text-xs text-stone-500">{t('bonds.offerSource', { month: market.offerMonth })}</p>}
       <Card title={t('bonds.compare')} testId="bond-compare">
         <div className="grid gap-3 sm:grid-cols-4">
-          <Field label={t('bonds.amount')}>
+          <Field label={`${t('bonds.amount')} (PLN)`}>
             <Num value={amount} onChange={setAmount} testId="c-amount" />
           </Field>
           <Field label={t('bonds.years')}>
@@ -75,10 +80,12 @@ export function Bonds() {
                   {r.code === 'deposit' ? t('kind.deposit') : r.code} <span className="text-xs font-normal text-stone-500">{r.series}</span>
                 </td>
                 <td className="text-right font-bold">
-                  <Money v={r.net} testId={`cmp-net-${r.code}`} />
+                  <span className="num" data-testid={`cmp-net-${r.code}`} data-value={r.net}>
+                    {money(lang, r.net)}
+                  </span>
                 </td>
                 <td className="text-right">
-                  <Money v={r.real} />
+                  {money(lang, r.real)}
                 </td>
                 <td className="text-right">
                   <Pct v={r.annual} sign={false} digits={2} />

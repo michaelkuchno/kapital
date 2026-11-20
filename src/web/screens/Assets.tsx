@@ -283,14 +283,14 @@ function PriceChart({ isin, avg }: { isin: string; avg: number }) {
 
 /** value of the bonds at the end of each interest period until maturity (assumed inflation for the future) */
 function BondPath({ v }: { v: BondValuation }) {
-  const { lang, t } = useApp()
+  const { fmt, t } = useApp()
   const capitalized = v.periods.length > 1 && v.periods[1].base !== 100
   let acc = 0
   const values = [v.nominal, ...v.periods.map((p) => (capitalized ? (p.base + p.interest) * v.count : ((acc += p.interest), (100 + acc) * v.count)))]
   if (v.periods.length < 2) return null
   return (
     <div className="mt-3" data-testid="bond-chart">
-      <LineChart x={[v.periods[0].start, ...v.periods.map((p) => p.end)]} height={150} lines={[{ values, color: '#0f3d3e', label: t('value') }]} format={(x) => money(lang, x)} />
+      <LineChart x={[v.periods[0].start, ...v.periods.map((p) => p.end)]} height={150} lines={[{ values, color: '#0f3d3e', label: t('value') }]} format={(x) => fmt(x)} />
       <p className="text-xs text-stone-500">{t('chart.bondPath')}</p>
     </div>
   )

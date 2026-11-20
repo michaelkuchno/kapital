@@ -19,6 +19,12 @@ export interface Settings extends Profile {
   id: string
   lang: Lang
   assumeCpi: number
+  /** amounts are shown in this currency (internally everything is PLN; CHF via the NBP rate) */
+  displayCurrency: 'PLN' | 'CHF'
+  /** answers of the planner ("Doradca") */
+  planner?: import('./planner-state').PlannerState
+  /** checklist items of the plan marked as done */
+  planDone?: string[]
 }
 export interface HistoryPoint {
   profileId: string
@@ -62,7 +68,14 @@ export function defaultLang(): Lang {
   const l = (typeof navigator !== 'undefined' ? navigator.language : 'pl').slice(0, 2)
   return l === 'de' ? 'de' : l === 'en' ? 'en' : 'pl'
 }
-export const DEFAULT_SETTINGS = (id = 'p1'): Settings => ({ id, ...DEFAULT_PROFILE, lang: defaultLang(), assumeCpi: 2.5 })
+/** a Swiss browser (de-CH, fr-CH, it-CH) starts in the Swiss version */
+export function defaultCountry(): 'PL' | 'CH' {
+  return typeof navigator !== 'undefined' && /-CH$/i.test(navigator.language) ? 'CH' : 'PL'
+}
+export const DEFAULT_SETTINGS = (id = 'p1'): Settings => {
+  const country = defaultCountry()
+  return { id, ...DEFAULT_PROFILE, country, lang: defaultLang(), assumeCpi: 2.5, displayCurrency: country === 'CH' ? 'CHF' : 'PLN' }
+}
 
 export async function loadSettings(id: string): Promise<Settings> {
   return { ...DEFAULT_SETTINGS(id), ...((await db.settings.get(id)) ?? {}), id }

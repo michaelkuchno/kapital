@@ -2,18 +2,25 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, loadSettings, saveSettings, DEFAULT_SETTINGS, ensurePeople, recordHistory, FAMILY, type Settings, type Person, type StoredAsset, type HistoryPoint } from './db'
 import { loadMarket, type MarketData } from './market'
-import { translate, type Lang } from './i18n'
+import { translate, money, type Lang, type DisplayCurrency } from './i18n'
 import { summarize, type PortfolioSummary } from '@core/assets'
 import { buildInsights, type Insight } from '@core/insights'
 import { latestCpi } from '@core/inflation'
 import { today } from '@core/dates'
 import type { RankedSector } from '@core/trends'
 
-export type Screen = 'dashboard' | 'assets' | 'market' | 'bonds' | 'plan' | 'learn' | 'insights' | 'settings'
+export type Screen = 'dashboard' | 'advisor' | 'assets' | 'market' | 'bonds' | 'plan' | 'learn' | 'insights' | 'settings'
 
 interface Ctx {
   lang: Lang
   t: (k: string, v?: Record<string, string | number>) => string
+  /** format an amount given in PLN in the display currency */
+  fmt: (pln: number, digits?: number) => string
+  /** format an amount that is already in the display currency */
+  fmtCur: (v: number, digits?: number) => string
+  cur: DisplayCurrency
+  /** PLN per 1 unit of the display currency (1 for PLN) */
+  rate: number
   settings: Settings
   update: (p: Partial<Settings>) => Promise<void>
   market: MarketData | null
@@ -135,9 +142,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const lang = settings.lang
   const t = useCallback((k: string, v?: Record<string, string | number>) => translate(lang, k, v), [lang])
+  const chf = market?.fx?.rates?.CHF
+  const cur: DisplayCurrency = settings.displayCurrency === 'CHF' && chf ? 'CHF' : 'PLN'
+  const rate = cur === 'CHF' ? chf! : 1
+  const fmt = useCallback((pln: number, digits = 0) => money(lang, pln / rate, digits, cur), [lang, rate, cur])
+  const fmtCur = useCallback((v: number, digits = 0) => money(lang, v, digits, cur), [lang, cur])
   const value = useMemo(
-    () => ({ lang, t, settings, update, market, people, active: valid, setActive, owner, assets, summary, insights, history, asOf, screen, go }),
-    [lang, t, settings, update, market, people, valid, setActive, owner, assets, summary, insights, history, asOf, screen, go],
+    () => ({ lang, t, fmt, fmtCur, cur, rate, settings, update, market, people, active: valid, setActive, owner, assets, summary, insights, history, asOf, screen, go }),
+    [lang, t, fmt, fmtCur, cur, rate, settings, update, market, people, valid, setActive, owner, assets, summary, insights, history, asOf, screen, go],
   )
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>
 }

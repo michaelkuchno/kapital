@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../state'
 import { Card, Pct, Modal } from '../components/ui'
-import { LineChart } from '../components/charts'
+import { LineChart, Gauge } from '../components/charts'
+import { percent } from '../i18n'
+import type { Signal } from '@core/signals'
+import type { Sentiment } from '@core/sentiment'
 import { loadSeries } from '../market'
 import { SECTOR_NAMES, type IndexSummary } from '@data/summaries'
 import { sma, type Bar } from '@core/stats'
@@ -104,6 +107,104 @@ function Table({ rows, ranked, onOpen, testId }: { rows: IndexSummary[]; ranked?
   )
 }
 
+const SIG: Record<Signal, string> = { buy: 'bg-emerald-100 text-emerald-800', sell: 'bg-red-100 text-red-800', neutral: 'bg-stone-100 text-stone-700' }
+
+function Sentiments() {
+  const { t, market, lang } = useApp()
+  const a = market?.analysis
+  const one = (s: Sentiment | undefined, key: 'pl' | 'world') =>
+    s ? (
+      <div className="flex flex-col items-center" data-testid={`fg-${key}`}>
+        <Gauge value={s.score} label={t(`fg.${key}`)} sub={t(`mood.${s.mood}`)} testId={`gauge-${key}`} />
+        <ul className="mt-2 w-full max-w-xs space-y-1 text-xs">
+          {s.components.map((c) => (
+            <li key={c.id} className="flex items-center gap-2" data-testid={`fg-comp-${key}-${c.id}`}>
+              <span className="w-36 text-stone-600">{t(`fgc.${c.id}`)}</span>
+              <span className="h-2 flex-1 rounded bg-stone-100">
+                <span className="block h-2 rounded" style={{ width: `${c.score}%`, background: c.score < 45 ? '#c0392b' : c.score > 55 ? '#1f8a4c' : '#a8a29e' }} />
+              </span>
+              <span className="w-8 text-right num">{Math.round(c.score)}</span>
+            </li>
+          ))}
+        </ul>
+        {s.history.length > 20 && (
+          <div className="mt-2 w-full">
+            <LineChart x={s.history.map((h) => h.date)} height={110} lines={[{ values: s.history.map((h) => h.score), color: '#0f3d3e', label: t(`fg.${key}`) }, { values: s.history.map(() => 50), color: '#d6d3d1', dash: '3 3' }]} format={(v) => v.toFixed(0)} />
+          </div>
+        )}
+      </div>
+    ) : null
+  return (
+    <Card title={t('fg.title')} testId="sentiment">
+      <p className="mb-3 text-xs text-stone-500">{t('fg.explain')}</p>
+      <div className="grid gap-6 md:grid-cols-2">
+        {one(a?.sentiment.pl, 'pl')}
+        {one(a?.sentiment.world, 'world')}
+      </div>
+      {a?.world && (
+        <p className="mt-3 text-center text-sm" data-testid="vix">
+          <b>VIX</b> {a.world.vix.toFixed(1)} ({dateFmt(lang, a.world.vixDate)}) · {t(a.world.vix >= 30 ? 'vix.high' : a.world.vix >= 20 ? 'vix.elevated' : 'vix.calm')}
+          {a.world.sp500Signal && (
+            <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-bold ${SIG[a.world.sp500Signal.signal]}`}>
+              S&P 500: {t(`sig.${a.world.sp500Signal.signal}`)}
+            </span>
+          )}
+        </p>
+      )}
+      {!a?.sentiment.pl && !a?.sentiment.world && <p className="text-sm text-stone-500">{t('dataMissing')}</p>}
+    </Card>
+  )
+}
+
+function Signals() {
+  const { t, market, lang } = useApp()
+  const rows = market?.analysis?.signals ?? []
+  if (!rows.length) return null
+  return (
+    <Card title={t('sig.title')} testId="signals">
+      <p className="mb-3 text-xs text-stone-500">{t('sig.explain')}</p>
+      <div className="-mx-4 overflow-x-auto px-4">
+        <table className="w-full min-w-[760px] text-sm" data-testid="signal-table">
+          <thead className="text-left text-xs text-stone-500">
+            <tr>
+              <th>{t('col.name')}</th>
+              <th>{t('sig.col.signal')}</th>
+              <th>{t('sig.col.since')}</th>
+              <th className="text-right">RSI</th>
+              <th className="text-right">{t('sig.col.fromHigh')}</th>
+              <th className="text-right">{t('sig.col.rule')}</th>
+              <th className="text-right">{t('sig.col.bh')}</th>
+              <th className="text-right">{t('sig.col.dd')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ code, report: r }) => (
+              <tr key={code} className="border-t border-stone-100" data-testid={`sig-${code}`} data-signal={r.signal}>
+                <td className="py-2 font-semibold">
+                  {SECTOR_NAMES[code]?.[lang] ?? code}
+                  <div className="text-[11px] font-normal text-stone-500">{r.reasons.map((x) => t(`why.${x}`)).join(' · ')}</div>
+                </td>
+                <td>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${SIG[r.signal]}`}>{t(`sig.${r.signal}`)}</span>
+                </td>
+                <td className="text-xs">{dateFmt(lang, r.since)}</td>
+                <td className="text-right num">{r.rsi != null ? r.rsi.toFixed(0) : '–'}</td>
+                <td className="text-right">
+                  <Pct v={r.fromHigh} />
+                </td>
+                <td className="text-right">{r.backtest ? <Pct v={r.backtest.rule} /> : '–'}</td>
+                <td className="text-right">{r.backtest ? <Pct v={r.backtest.buyHold} /> : '–'}</td>
+                <td className="text-right text-xs">{r.backtest ? `${percent(lang, r.backtest.ruleMaxDD, 0)} / ${percent(lang, r.backtest.buyHoldMaxDD, 0)}` : '–'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-xs text-stone-500">{t('sig.note', { from: rows[0]?.report.backtest ? dateFmt(lang, rows[0].report.backtest.from) : '–' })}</p>
+    </Card>
+  )
+}
+
 export function Market() {
   const { t, lang, market, asOf } = useApp()
   const [open, setOpen] = useState<string | null>(null)
@@ -115,6 +216,8 @@ export function Market() {
     <div className="space-y-4" data-testid="market">
       <h1 className="text-2xl font-extrabold text-sea">{t('market.title')}</h1>
       <p className="text-xs text-stone-500">{t('dataAsOf', { date: dateFmt(lang, market.meta.lastTradingDay) })}</p>
+      <Sentiments />
+      <Signals />
       <Card title={t('market.recent')} testId="recent-events">
         {recent.length ? (
           <ul className="space-y-1 text-sm">

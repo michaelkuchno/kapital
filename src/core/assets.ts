@@ -111,6 +111,8 @@ export interface PortfolioSummary {
   /** share protected against inflation (inflation-indexed bonds) */
   inflationProtected: number
   equityShare: number
+  /** share of the wealth in Polish złoty (everything except foreign cash and gold) */
+  plnShare: number
   items: ValuedAsset[]
 }
 
@@ -167,6 +169,7 @@ export function summarize(assets: readonly Asset[], m: MarketInputs): PortfolioS
     hhi,
     inflationProtected: share(byClass['bonds-inflation'], total),
     equityShare: share(byClass.equities, total),
+    plnShare: share(items.filter((i) => i.asset.kind !== 'fx' && i.asset.kind !== 'gold').reduce((a, i) => a + i.value, 0), total),
     items,
   }
 }

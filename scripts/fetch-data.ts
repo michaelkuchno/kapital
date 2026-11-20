@@ -6,7 +6,9 @@
  */
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { fetchCpi, fetchFx, fetchGold, fetchGpwDay, fetchNbpRates, fetchOffer, sleep } from '../src/data/fetch'
+import { fetchCpi, fetchSnb, fetchFred, fetchFx, fetchGold, fetchGpwDay, fetchNbpRates, fetchOffer, sleep } from '../src/data/fetch'
+import { FRED, SNB } from '../src/data/parse'
+import { analyzeMarket } from '../src/data/analysis'
 import { INDICES } from '../src/data/parse'
 import { fileKey, fromCsv, groupRows, mergeBars, missingDays, toCsv, type StoredBar } from '../src/data/store'
 import { summarizeIndices } from '../src/data/summaries'
@@ -19,6 +21,8 @@ const arg = (name: string, dflt: string) => {
 }
 const OUT = arg('out', 'public/data')
 const BACKFILL = Number(arg('backfill', '560'))
+/** years of index history (indices only – one small file per day) */
+const INDEX_YEARS = Number(arg('index-years', '5'))
 const SKIP_SHARES = process.argv.includes('--skip-shares')
 const today = new Date().toISOString().slice(0, 10)
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a)
@@ -104,9 +108,47 @@ async function main() {
   // save the progress right away: an interrupted run (restart, network) does not have to fetch the quotes again
   writeFileSync(join(OUT, 'meta.json'), JSON.stringify({ ...meta, updatedAt: new Date().toISOString(), lastTradingDay: lastDay, errors }, null, 1))
 
-  // 2. trend summary
+  // 1b. longer index history (once): indices only, back to INDEX_YEARS years
+  const earliest = allIdx.get('WIG')?.[0]?.date
+  const target = new Date(Date.now() - INDEX_YEARS * 365.25 * 86_400_000).toISOString().slice(0, 10)
+  // an index added later (e.g. TBSP) has no history yet → fetch the whole period for all indices
+  const wigLen = allIdx.get('WIG')?.length ?? 0
+  const incomplete = INDICES.some((n) => (allIdx.get(n)?.length ?? 0) < wigLen - 10)
+  if (earliest && (earliest > target || incomplete) && !process.argv.includes('--skip-index-history')) {
+    const until = incomplete ? (lastDay ?? today) : new Date(Date.parse(earliest) - 86_400_000).toISOString().slice(0, 10)
+    const back = missingDays(null, until, Math.round((Date.parse(until) - Date.parse(target)) / 86_400_000) + 1)
+    log(`index history: ${back.length} weekday(s) back to ${target}`)
+    const extra = new Map<string, StoredBar[]>()
+    for (const day of back) {
+      try {
+        for (const [name, bar] of groupRows(await fetchGpwDay('indices', day), 'name')) if ((INDICES as readonly string[]).includes(name)) extra.set(name, [...(extra.get(name) ?? []), bar])
+      } catch (e) {
+        errors.push(`index history ${day}: ${(e as Error).message}`)
+      }
+      await sleep(200)
+    }
+    for (const name of INDICES) {
+      const merged = mergeBars(allIdx.get(name) ?? [], extra.get(name) ?? [])
+      if (merged.length) writeFileSync(join(OUT, 'indices', `${fileKey(name)}.csv`), toCsv(merged.map(({ date, close }) => ({ date, close }))))
+      allIdx.set(name, merged)
+    }
+  }
+
+  // 2. trend summary, buy/sell signals, Fear & Greed (Poland from GPW data, world from FRED)
   const summary = summarizeIndices(allIdx)
-  writeFileSync(join(OUT, 'summary.json'), JSON.stringify({ date: lastDay, ...summary }))
+  const from = new Date(Date.now() - 3 * 365.25 * 86_400_000).toISOString().slice(0, 10)
+  const fred = async (id: string) => fetchFred(id, from).catch((e) => (errors.push(`fred ${id}: ${e.message}`), []))
+  log('FRED (VIX, S&P 500, high-yield spread) …')
+  const [vix, sp500, hy] = [await fred(FRED.vix), await fred(FRED.sp500), await fred(FRED.hy)]
+  const shareBars = existsSync(join(OUT, 'shares'))
+    ? readdirSync(join(OUT, 'shares'))
+        .filter((f) => f.endsWith('.csv'))
+        .map((f) => fromCsv(readFileSync(join(OUT, 'shares', f), 'utf8')).map(({ date, close }) => ({ date, close })))
+    : []
+  const analysis = analyzeMarket({ indices: allIdx, shares: shareBars, vix, sp500, hySpread: hy })
+  writeFileSync(join(OUT, 'summary.json'), JSON.stringify({ date: lastDay, ...summary, ...analysis }))
+  writeFileSync(join(OUT, 'world.json'), JSON.stringify({ vix: vix.slice(-520), sp500: sp500.slice(-520), hy: hy.slice(-520) }))
+  log(`sentiment PL ${analysis.sentiment.pl?.score.toFixed(0)} (${analysis.sentiment.pl?.mood}), world ${analysis.sentiment.world?.score.toFixed(0)} (${analysis.sentiment.world?.mood}); signals ${analysis.signals.length}`)
 
   // 3. macro: CPI (36 months, re-check the last 3 – GUS may revise), NBP, FX, gold
   const macro = readJson<{ cpi?: CpiPoint[] }>(join(OUT, 'macro.json'), {})
@@ -130,7 +172,14 @@ async function main() {
   const nbp = await fetchNbpRates().catch((e) => (errors.push(`nbp: ${e.message}`), readJson(join(OUT, 'macro.json'), {} as Record<string, unknown>).nbp))
   const fx = await fetchFx().catch((e) => (errors.push(`fx: ${e.message}`), undefined))
   const gold = await fetchGold().catch((e) => (errors.push(`gold: ${e.message}`), undefined))
-  writeFileSync(join(OUT, 'macro.json'), JSON.stringify({ cpi, nbp, fx, gold }))
+  // Switzerland (SNB): CPI y/y, policy rate, 10-year Confederation bond yield
+  log('SNB …')
+  const snb = async (cube: string, key: string) => fetchSnb(cube, key).catch((e) => (errors.push(`snb ${cube}: ${e.message}`), []))
+  const chCpi = (await snb(...SNB.cpi)).slice(-48)
+  const chPolicy = (await snb(...SNB.policy)).at(-1)
+  const chY10 = (await snb(...SNB.y10)).at(-1)
+  const ch = chCpi.length ? { cpi: chCpi.map((p) => ({ month: p.date, yoy: Math.round(p.value * 100) / 100 })), policy: chPolicy, y10: chY10 } : undefined
+  writeFileSync(join(OUT, 'macro.json'), JSON.stringify({ cpi, nbp, fx, gold, ch }))
 
   // 4. bond offer
   log('bond offer …')

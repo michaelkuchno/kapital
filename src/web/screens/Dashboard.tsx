@@ -1,7 +1,6 @@
 import { useApp } from '../state'
 import { Card, Money, Pct, Stat, InsightCard } from '../components/ui'
-import { Donut, LineChart } from '../components/charts'
-import { money } from '../i18n'
+import { Donut, LineChart, Gauge } from '../components/charts'
 import { latestCpi } from '@core/inflation'
 import type { AssetClass, Liquidity } from '@core/assets'
 import { SECTOR_NAMES } from '@data/summaries'
@@ -11,7 +10,7 @@ export const CLASS_COLORS: Record<AssetClass, string> = { 'bonds-inflation': '#0
 const LIQ: Liquidity[] = ['now', 'days', 'fee', 'locked']
 
 export function Dashboard() {
-  const { t, lang, summary: s, insights, market, go, history } = useApp()
+  const { t, lang, summary: s, insights, market, go, history, fmt, settings } = useApp()
   const cpi = latestCpi(market?.cpi ?? [])
   const gainPct = s.cost ? s.gain / s.cost : 0
   const wig = market?.summary.indices.find((x) => x.code === 'WIG')
@@ -51,10 +50,10 @@ export function Dashboard() {
         <Stat label={t('gain')} testId="stat-gain">
           <Money v={s.gain} sign /> <span className="text-base">(<Pct v={gainPct} />)</span>
         </Stat>
-        <Stat label={t('inflation')} testId="stat-cpi">
-          {cpi ? <Pct v={cpi.yoy / 100} sign={false} /> : '–'}
+        <Stat label={settings.country === 'CH' ? t('inflationCh') : t('inflation')} testId="stat-cpi">
+          {settings.country === 'CH' ? (market?.ch ? <Pct v={market.ch.cpi / 100} sign={false} digits={2} /> : '–') : cpi ? <Pct v={cpi.yoy / 100} sign={false} /> : '–'}
           <div className="text-xs font-normal text-stone-500">
-            {cpi?.month} · {t('refRate')}: {market?.ref ? rate(lang, market.ref.ref) : '–'}
+            {settings.country === 'CH' ? `${market?.ch?.cpiMonth ?? ''} · ${t('snbRate')}: ${market?.ch?.policy != null ? rate(lang, market.ch.policy) : '–'}` : `${cpi?.month ?? ''} · ${t('refRate')}: ${market?.ref ? rate(lang, market.ref.ref) : '–'}`}
           </div>
         </Stat>
       </div>
@@ -118,9 +117,17 @@ export function Dashboard() {
         </Card>
       </div>
 
+      {(market?.analysis?.sentiment.pl || market?.analysis?.sentiment.world) && (
+        <Card title={t('fg.title')} testId="dash-sentiment" action={<button type="button" className="text-sm font-semibold text-sea-2 underline" onClick={() => go('market')}>→</button>}>
+          <div className="flex flex-wrap justify-around">
+            {market.analysis.sentiment.pl && <Gauge value={market.analysis.sentiment.pl.score} label={t('fg.pl')} sub={t(`mood.${market.analysis.sentiment.pl.mood}`)} size={160} testId="dash-gauge-pl" />}
+            {market.analysis.sentiment.world && <Gauge value={market.analysis.sentiment.world.score} label={t('fg.world')} sub={t(`mood.${market.analysis.sentiment.world.mood}`)} size={160} testId="dash-gauge-world" />}
+          </div>
+        </Card>
+      )}
       <Card title={t('dash.history')} testId="history">
         {history.length >= 2 ? (
-          <LineChart x={history.map((h) => h.date)} height={170} lines={[{ values: history.map((h) => h.total), color: '#0f3d3e', width: 2.5, label: t('netWorth') }, { values: history.map((h) => h.cost), color: '#a8a29e', dash: '5 4', label: t('cost') }]} format={(v) => money(lang, v)} />
+          <LineChart x={history.map((h) => h.date)} height={170} lines={[{ values: history.map((h) => h.total), color: '#0f3d3e', width: 2.5, label: t('netWorth') }, { values: history.map((h) => h.cost), color: '#a8a29e', dash: '5 4', label: t('cost') }]} format={(v) => fmt(v)} />
         ) : (
           <p className="text-sm text-stone-500" data-testid="history-empty">
             {t('dash.historyEmpty')}

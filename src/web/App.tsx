@@ -7,11 +7,13 @@ import { Plan } from './screens/Plan'
 import { Insights } from './screens/Insights'
 import { Settings } from './screens/Settings'
 import { Learn } from './screens/Learn'
+import { Advisor } from './screens/Advisor'
 import { FAMILY } from './db'
 import { dateFmt } from './i18n'
 
 const NAV: { id: Screen; icon: string }[] = [
   { id: 'dashboard', icon: '◎' },
+  { id: 'advisor', icon: '✨' },
   { id: 'assets', icon: '▤' },
   { id: 'market', icon: '↗' },
   { id: 'bonds', icon: '§' },
@@ -24,7 +26,7 @@ const NAV: { id: Screen; icon: string }[] = [
 function Shell() {
   const { t, lang, screen, go, market, insights, people, active, setActive } = useApp()
   const warn = insights.filter((i) => i.severity === 'warn').length
-  const body = { dashboard: <Dashboard />, assets: <Assets />, market: <Market />, bonds: <Bonds />, plan: <Plan />, learn: <Learn />, insights: <Insights />, settings: <Settings /> }[screen] ?? <Dashboard />
+  const body = { dashboard: <Dashboard />, assets: <Assets />, market: <Market />, bonds: <Bonds />, plan: <Plan />, learn: <Learn />, advisor: <Advisor />, insights: <Insights />, settings: <Settings /> }[screen] ?? <Dashboard />
   return (
     <div className="mx-auto flex min-h-full max-w-6xl flex-col">
       <header className="flex items-center gap-3 px-4 pb-2 pt-[max(env(safe-area-inset-top),0.75rem)]">

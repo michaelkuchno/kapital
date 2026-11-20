@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useApp } from '../state'
-import { money, percent, dateFmt, type Lang } from '../i18n'
+import { percent, dateFmt, type Lang } from '../i18n'
 import { EVIDENCE } from '@core/evidence'
 import type { Insight } from '@core/insights'
 
@@ -19,8 +19,8 @@ export function Card({ title, children, className = '', testId, action }: { titl
 }
 
 export function Money({ v, digits = 0, sign = false, testId }: { v: number; digits?: number; sign?: boolean; testId?: string }) {
-  const { lang } = useApp()
-  const s = money(lang, v, digits)
+  const { fmt } = useApp()
+  const s = fmt(v, digits)
   return (
     <span className={`num ${sign ? (v > 0 ? 'text-up' : v < 0 ? 'text-down' : '') : ''}`} data-testid={testId} data-value={v}>
       {sign && v > 0 ? '+' : ''}

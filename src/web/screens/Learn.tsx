@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useApp } from '../state'
 import { Card } from '../components/ui'
 import { LineChart } from '../components/charts'
-import { money, rate } from '../i18n'
+import { rate } from '../i18n'
+import { PILLAR3A_2026 } from '@core/products'
 import { mulberry32, normal } from '@core/montecarlo'
 import { sma } from '@core/stats'
 import { loadSeries } from '../market'
@@ -46,7 +47,7 @@ function Lesson({ id, title, lead, children, years, setYears, max, label }: { id
 
 /** 1. Compound interest: the same money with and without interest on interest */
 function Compound() {
-  const { t, lang } = useApp()
+  const { t, fmtCur } = useApp()
   const [y, setY] = useState(30)
   const r = 0.06
   const start = 10_000
@@ -55,7 +56,7 @@ function Compound() {
   const max = start * Math.pow(1 + r, 30)
   const bar = (v: number, color: string, testId: string) => <div className="w-full rounded-t-xl transition-all duration-300" style={{ height: `${(v / max) * 100}%`, background: color }} data-testid={testId} data-value={Math.round(v)} />
   return (
-    <Lesson id="compound" title={t('learn.compound.title')} lead={t('learn.compound.lead')} years={y} setYears={setY} max={30} label={t('learn.years', { n: y })}>
+    <Lesson id="compound" title={t('learn.compound.title')} lead={t('learn.compound.lead', { amount: fmtCur(start) })} years={y} setYears={setY} max={30} label={t('learn.years', { n: y })}>
       <div className="flex h-48 items-end gap-6 px-6">
         {[
           [start, '#a8a29e', 'learn.compound.none', 'bar-none'],
@@ -63,21 +64,22 @@ function Compound() {
           [comp, '#0f3d3e', 'learn.compound.compound', 'bar-compound'],
         ].map(([v, c, k, id]) => (
           <div key={k as string} className="flex h-full flex-1 flex-col justify-end text-center">
-            <div className="num mb-1 text-sm font-bold">{money(lang, v as number)}</div>
+            <div className="num mb-1 text-sm font-bold">{fmtCur(v as number)}</div>
             {bar(v as number, c as string, id as string)}
             <div className="mt-1 text-xs text-stone-600">{t(k as string)}</div>
           </div>
         ))}
       </div>
-      <p className="mt-2 text-sm">{t('learn.compound.result', { years: y, extra: Math.round(comp - simple) })}</p>
+      <p className="mt-2 text-sm">{t('learn.compound.result', { years: y, extra: fmtCur(comp - simple) })}</p>
     </Lesson>
   )
 }
 
 /** 2. Inflation: what 100 zł buys after n years */
 function Inflation() {
-  const { t, lang, market } = useApp()
-  const cpi = market?.cpi.at(-1)?.yoy ?? 3.5
+  const { t, fmtCur, market, settings } = useApp()
+  // Swiss families: Swiss inflation (SNB), otherwise Polish (GUS)
+  const cpi = settings.country === 'CH' ? (market?.ch?.cpi ?? 1) : (market?.cpi.at(-1)?.yoy ?? 3.5)
   const [y, setY] = useState(10)
   const left = 100 / Math.pow(1 + cpi / 100, y)
   return (
@@ -87,10 +89,10 @@ function Inflation() {
           <circle cx="60" cy="60" r="56" fill="#f4f1ea" stroke="#d6d3d1" strokeDasharray="4 4" />
           <circle cx="60" cy="60" r={56 * Math.sqrt(left / 100)} fill="#c99a2e" className="transition-all duration-300" data-testid="coin" />
           <text x="60" y="66" textAnchor="middle" fontSize="18" fontWeight="800" fill="#12201f">
-            {Math.round(left)} zł
+            {fmtCur(left)}
           </text>
         </svg>
-        <p className="max-w-xs text-sm">{t('learn.inflation.result', { years: y, value: money(lang, left, 2) })}</p>
+        <p className="max-w-xs text-sm">{t('learn.inflation.result', { years: y, value: fmtCur(left, 2), hundred: fmtCur(100) })}</p>
       </div>
     </Lesson>
   )
@@ -98,7 +100,7 @@ function Inflation() {
 
 /** 3. How an EDO bond grows, year by year (offer of the month, assumed inflation) */
 function Edo() {
-  const { t, lang, market, settings } = useApp()
+  const { t, lang, market, settings, fmtCur } = useApp()
   const edo = market?.offer.find((o) => o.code === 'EDO') ?? { firstRate: 5.35, margin: 2 }
   const [y, setY] = useState(10)
   const vals: number[] = [100]
@@ -114,7 +116,7 @@ function Edo() {
           </div>
         ))}
       </div>
-      <p className="mt-2 text-sm">{t('learn.edo.result', { cpi: settings.assumeCpi, gross: money(lang, vals[10] * 100), net: money(lang, net * 100) })}</p>
+      <p className="mt-2 text-sm">{t('learn.edo.result', { cpi: settings.assumeCpi, amount: fmtCur(10_000), gross: fmtCur(vals[10] * 100), net: fmtCur(net * 100) })}</p>
     </Lesson>
   )
 }
@@ -176,33 +178,36 @@ function Trend() {
 
 /** 6. Tax wrappers: the same saving with and without Belka tax (IKE) */
 function Wrapper() {
-  const { t, lang } = useApp()
+  const { t, fmtCur, settings, cur, market } = useApp()
   const [y, setY] = useState(20)
-  const yearly = 10_000
-  const r = 0.06
-  const ike = futureValue(0, yearly / 12, y, r)
-  const taxed = futureValue(0, yearly / 12, y, r * (1 - BELKA))
+  const ch = settings.country === 'CH'
+  // Poland: IKE vs 19 % tax on gains; Switzerland: pillar 3a with ~25 % income-tax refund invested as well
+  const yearly = ch ? (cur === 'CHF' ? PILLAR3A_2026 : PILLAR3A_2026 * (market?.fx?.rates.CHF ?? 4.8)) : 10_000
+  const r = ch ? 0.04 : 0.06
+  const ike = ch ? futureValue(0, (yearly * 1.25) / 12, y, r) : futureValue(0, yearly / 12, y, r)
+  const taxed = ch ? futureValue(0, yearly / 12, y, r) : futureValue(0, yearly / 12, y, r * (1 - BELKA))
+  const k = ch ? 'learn.p3a' : 'learn.ike'
   return (
-    <Lesson id="ike" title={t('learn.ike.title')} lead={t('learn.ike.lead')} years={y} setYears={setY} max={30} label={t('learn.years', { n: y })}>
+    <Lesson id="ike" title={t(`${k}.title`)} lead={t(`${k}.lead`, { amount: fmtCur(yearly), refund: fmtCur(yearly * 0.25) })} years={y} setYears={setY} max={30} label={t('learn.years', { n: y })}>
       <div className="space-y-2">
         {[
-          [ike, '#0f3d3e', t('learn.ike.with'), 'ike-with'],
-          [taxed, '#a8a29e', t('learn.ike.without'), 'ike-without'],
+          [ike, '#0f3d3e', t(`${k}.with`), 'ike-with'],
+          [taxed, '#a8a29e', t(`${k}.without`), 'ike-without'],
         ].map(([v, c, l, id]) => (
           <div key={id as string}>
             <div className="flex text-sm">
               <span className="flex-1">{l as string}</span>
               <b className="num" data-testid={id as string} data-value={Math.round(v as number)}>
-                {money(lang, v as number)}
+                {fmtCur(v as number)}
               </b>
             </div>
             <div className="h-4 rounded bg-stone-100">
-              <div className="h-4 rounded transition-all duration-300" style={{ width: `${((v as number) / futureValue(0, yearly / 12, 30, r)) * 100}%`, background: c as string }} />
+              <div className="h-4 rounded transition-all duration-300" style={{ width: `${((v as number) / (ch ? futureValue(0, (yearly * 1.25) / 12, 30, r) : futureValue(0, yearly / 12, 30, r))) * 100}%`, background: c as string }} />
             </div>
           </div>
         ))}
       </div>
-      <p className="mt-2 text-sm">{t('learn.ike.result', { years: y, diff: Math.round(ike - taxed) })}</p>
+      <p className="mt-2 text-sm">{t(`${k}.result`, { years: y, diff: fmtCur(ike - taxed) })}</p>
     </Lesson>
   )
 }

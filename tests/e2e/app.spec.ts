@@ -50,7 +50,7 @@ test('empty start: every screen opens, market data is loaded, disclaimer is show
   await expect(page.getByTestId('assets')).toBeVisible()
   await page.getByTestId('nav-insights').click()
   await expect(page.getByTestId('insight-empty')).toBeVisible()
-  for (const s of ['assets', 'market', 'bonds', 'plan', 'learn', 'insights', 'settings', 'dashboard']) {
+  for (const s of ['advisor', 'assets', 'market', 'bonds', 'plan', 'learn', 'insights', 'settings', 'dashboard']) {
     await page.getByTestId(`nav-${s}`).click()
     await expect(page.getByTestId(s)).toBeVisible()
     await expect(page).toHaveURL(new RegExp(`#${s}$`))
@@ -147,7 +147,7 @@ test('market: 14 sectors ranked with trends, indices, a chart with averages @mob
   const rows = page.getByTestId('sector-table').locator('tbody tr')
   await expect(rows).toHaveCount(14)
   for (const code of ['WIG-BANKI', 'WIG-ENERG', 'WIG-GRY', 'WIG-PALIWA']) await expect(page.getByTestId(`row-${code}`)).toBeVisible()
-  await expect(page.getByTestId('index-table').locator('tbody tr')).toHaveCount(4)
+  await expect(page.getByTestId('index-table').locator('tbody tr')).toHaveCount(7)
   const states = await page.locator('[data-testid^="state-"]').allTextContents()
   expect(states.every((s) => /wzrostowy|spadkowy|wyraźnego|danych/.test(s))).toBe(true)
   await expect(page.getByTestId('recent-events')).toBeVisible()
@@ -247,7 +247,7 @@ test('settings drive the insights (expenses → emergency fund, risk profile)', 
 
 test('phone layout: nothing wider than the screen on any page @mobile', async ({ page }) => {
   await addStock(page, 'SKARBIEC', '100', '3000')
-  for (const s of ['dashboard', 'assets', 'bonds', 'plan', 'learn', 'insights', 'settings']) {
+  for (const s of ['dashboard', 'advisor', 'assets', 'market', 'bonds', 'plan', 'learn', 'insights', 'settings']) {
     await page.getByTestId(`nav-${s}`).click()
     await expect(page.getByTestId(s)).toBeVisible()
     const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)

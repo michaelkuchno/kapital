@@ -26,5 +26,8 @@ export const EVIDENCE: Record<string, Evidence> = {
   ike: { id: 'ike', cite: 'Ustawa z 20 kwietnia 2004 r. o indywidualnych kontach emerytalnych oraz indywidualnych kontach zabezpieczenia emerytalnego.', url: 'https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=WDU20041160205' },
   gus: { id: 'gus', cite: 'GUS – wskaźniki cen towarów i usług konsumpcyjnych (inflacja).', url: 'https://stat.gov.pl/' },
   nbp: { id: 'nbp', cite: 'NBP – stopy procentowe, kursy walut, ceny złota.', url: 'https://nbp.pl/' },
+  snb: { id: 'snb', cite: 'Schweizerische Nationalbank – Leitzins, Landesindex der Konsumentenpreise, Renditen der Bundesobligationen (data.snb.ch).', url: 'https://data.snb.ch/' },
+  pillar3a: { id: 'pillar3a', cite: 'Gebundene Vorsorge (Säule 3a): BVV 3, Art. 7; Maximalbetrag 2026: CHF 7 258 für Erwerbstätige mit Pensionskasse (BSV).', url: 'https://www.bsv.admin.ch/' },
+  vanguard2012: { id: 'vanguard2012', cite: 'Shtekhman, A., Tasopoulos, C., Wimmer, B. (2012). Dollar-cost averaging just means taking risk later. Vanguard Research.', url: 'https://www.vanguard.com/pdf/ISGDCA.pdf' },
   gpw: { id: 'gpw', cite: 'Giełda Papierów Wartościowych w Warszawie – archiwum notowań, indeksy sektorowe (GPW Benchmark).', url: 'https://www.gpw.pl/archiwum-notowan' },
 }

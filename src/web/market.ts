@@ -16,6 +16,10 @@ export interface MarketData {
   offerMonth?: string
   summary: { date?: string; indices: IndexSummary[]; sectors: IndexSummary[] }
   shares: { isin: string; name: string; last: number; date: string; type?: 'share' | 'etf' }[]
+  /** Switzerland (SNB): latest CPI y/y, its month, policy rate, 10-year Confederation yield */
+  ch?: { cpi: number; cpiMonth: string; policy?: number; y10?: number; y10Date?: string }
+  analysis?: import('@data/analysis').MarketAnalysis
+  world?: { vix: { date: string; value: number }[]; sp500: { date: string; value: number }[]; hy: { date: string; value: number }[] }
 }
 
 const base = () => `${import.meta.env.BASE_URL}data/`
@@ -32,11 +36,13 @@ async function json<T>(path: string, fallback: T): Promise<T> {
 export async function loadMarket(): Promise<MarketData> {
   const [meta, macro, offer, summary, shares] = await Promise.all([
     json<MarketData['meta']>('meta.json', {}),
-    json<{ cpi?: CpiPoint[]; nbp?: { ref: number; from: string; history?: RefRate[] }; fx?: MarketData['fx']; gold?: MarketData['gold'] }>('macro.json', {}),
+    json<{ cpi?: CpiPoint[]; nbp?: { ref: number; from: string; history?: RefRate[] }; fx?: MarketData['fx']; gold?: MarketData['gold']; ch?: { cpi: CpiPoint[]; policy?: { date: string; value: number }; y10?: { date: string; value: number } } }>('macro.json', {}),
     json<{ month?: string; items?: MarketData['offer'] }>('offer.json', {}),
-    json<MarketData['summary']>('summary.json', { indices: [], sectors: [] }),
+    json<MarketData['summary'] & Partial<import('@data/analysis').MarketAnalysis>>('summary.json', { indices: [], sectors: [] }),
     json<MarketData['shares']>('shares/index.json', []),
   ])
+  const world = await json<MarketData['world']>('world.json', undefined)
+  const chLast = macro.ch?.cpi.at(-1)
   return {
     meta,
     cpi: macro.cpi ?? [],
@@ -47,6 +53,9 @@ export async function loadMarket(): Promise<MarketData> {
     offerMonth: offer.month,
     summary: { indices: summary.indices ?? [], sectors: summary.sectors ?? [], date: summary.date },
     shares,
+    ch: chLast ? { cpi: chLast.yoy, cpiMonth: chLast.month, policy: macro.ch?.policy?.value, y10: macro.ch?.y10?.value, y10Date: macro.ch?.y10?.date } : undefined,
+    analysis: { signals: summary.signals ?? [], sentiment: summary.sentiment ?? {}, world: summary.world },
+    world,
   }
 }
 

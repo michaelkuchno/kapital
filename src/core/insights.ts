@@ -6,6 +6,7 @@ import type { PositionValuation } from './stocks'
 import { taxSavedByRealizingLoss } from './stocks'
 import type { RankedSector, TrendEvent } from './trends'
 import { round2 } from './money'
+import { PILLAR3A_2026 } from './products'
 import { daysBetween, type ISODate } from './dates'
 
 /**
@@ -37,9 +38,12 @@ export interface Profile {
   pitRate: 12 | 19 | 32
   /** realized gains from selling shares this year (PIT-38), zł */
   realizedGainsThisYear: number
+  /** where the family lives and pays tax: Poland or Switzerland */
+  country: 'PL' | 'CH'
+  usesPillar3a: boolean
 }
 
-export const DEFAULT_PROFILE: Profile = { monthlyExpenses: 0, risk: 3, horizonYears: 10, family800: false, usesIke: false, usesIkze: false, pitRate: 12, realizedGainsThisYear: 0 }
+export const DEFAULT_PROFILE: Profile = { monthlyExpenses: 0, risk: 3, horizonYears: 10, family800: false, usesIke: false, usesIkze: false, pitRate: 12, realizedGainsThisYear: 0, country: 'PL', usesPillar3a: false }
 
 /** Target share of equities by risk profile (inclusive range). */
 export const EQUITY_TARGET: Record<Profile['risk'], [number, number]> = { 1: [0, 0.1], 2: [0.1, 0.3], 3: [0.3, 0.5], 4: [0.5, 0.7], 5: [0.7, 0.9] }
@@ -131,16 +135,19 @@ export function buildInsights(inp: InsightInputs): Insight[] {
     if (v.current && !v.matured) out.push({ id: `bond-${it.asset.id}`, severity: 'info', key: 'insight.bondStatus', params: { name: `${v.series}`, value: v.value, net: v.netIfRedeemed, fee: v.earlyFee, rate: v.current.rate, nextReset: v.current.end, maturity: v.maturityDate, maturityNet: v.maturityNet }, evidence: ['bonds', 'pit'], ref: it.asset.id })
   }
 
-  // 9. family bonds for 800+ families
-  if (p.family800 && inp.offer) {
+  // 9. family bonds for 800+ families (Polish residents)
+  if (p.country === 'PL' && p.family800 && inp.offer) {
     const edo = inp.offer.find((o) => o.code === 'EDO')
     const rod = inp.offer.find((o) => o.code === 'ROD')
     if (edo && rod && rod.margin > edo.margin) out.push({ id: 'family-bonds', severity: 'tip', key: 'insight.familyBonds', params: { rod: rod.margin, edo: edo.margin, rodFirst: rod.firstRate, edoFirst: edo.firstRate }, evidence: ['bonds'] })
   }
 
-  // 10. tax wrappers
-  if (!p.usesIke) out.push({ id: 'ike', severity: 'tip', key: 'insight.ike', params: { limit: LIMITS_2026.ike, saved10: round2(LIMITS_2026.ike * (Math.pow(1.05, 10) - 1) * 0.19) }, evidence: ['ike', 'pit'] })
-  if (!p.usesIkze) out.push({ id: 'ikze', severity: 'tip', key: 'insight.ikze', params: { limit: LIMITS_2026.ikze, refund: round2((LIMITS_2026.ikze * p.pitRate) / 100) }, evidence: ['ike'] })
+  // 10. tax wrappers: IKE/IKZE in Poland, pillar 3a in Switzerland
+  if (p.country === 'CH') {
+    if (!p.usesPillar3a) out.push({ id: 'pillar3a', severity: 'tip', key: 'insight.pillar3a', params: { limit: PILLAR3A_2026, saved: Math.round(PILLAR3A_2026 * 0.25) }, evidence: ['pillar3a'] })
+    if (s.plnShare > 0.5) out.push({ id: 'fx-mismatch', severity: 'tip', key: 'insight.fxMismatch', params: { share: pct(s.plnShare, 0) }, evidence: ['markowitz1952'] })
+  } else if (!p.usesIke) out.push({ id: 'ike', severity: 'tip', key: 'insight.ike', params: { limit: LIMITS_2026.ike, saved10: round2(LIMITS_2026.ike * (Math.pow(1.05, 10) - 1) * 0.19) }, evidence: ['ike', 'pit'] })
+  if (p.country === 'PL' && !p.usesIkze) out.push({ id: 'ikze', severity: 'tip', key: 'insight.ikze', params: { limit: LIMITS_2026.ikze, refund: round2((LIMITS_2026.ikze * p.pitRate) / 100) }, evidence: ['ike'] })
 
   // 11. inflation protection share
   if (inp.cpi && s.inflationProtected > 0) out.push({ id: 'inflation-protected', severity: 'ok', key: 'insight.inflationProtected', params: { share: pct(s.inflationProtected), cpi: inp.cpi.yoy }, evidence: ['bonds', 'gus'] })

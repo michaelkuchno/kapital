@@ -6,6 +6,27 @@ Kapitał pokazuje cały majątek rodziny w jednym miejscu: obligacje skarbowe (E
 
 > Kapitał to narzędzie do analizy i nauki, a nie doradztwo inwestycyjne. Decyzję podejmujesz Ty. Przy dużych kwotach warto porozmawiać z licencjonowanym doradcą.
 
+## Nowe w 1.2
+- **Doradca ✨:** 5 kroków, po których dostajesz plan:
+  - **Pytania:** rodzina, kto zarabia, dzieci, dochody i wydatki w PLN lub CHF, stan konta, planowane wydatki, 5 pytań o ryzyko, horyzont.
+  - **Podział:** na część Bezpieczną, Zrównoważoną i Wzrostową.
+  - **Karta przy każdej propozycji:**
+    - stałe wskaźniki: ryzyko, koszty, ochrona przed inflacją, dostęp do pieniędzy, oczekiwany zwrot, podatek;
+    - z prawdziwych notowań: zmienność, największy spadek, zwrot 12 mies., sygnał trendu;
+    - mini-wykres.
+  - **Dodatkowo:**
+    - animowany przepływ pieniędzy i radar profilu,
+    - symulacja na 2 000 scenariuszy (plan kontra lokata),
+    - test kryzysu jak w 2008,
+    - plan miesięczny, cel dla dziecka,
+    - lista zadań z terminami.
+- **Polska 🇵🇱 i Szwajcaria 🇨🇭:**
+  - Kraj wybierasz w ustawieniach; od niego zależą podatki, konta emerytalne (IKE/IKZE albo filar 3a) i proponowane produkty.
+  - Kwoty mogą być pokazywane w PLN albo CHF, według kursu NBP.
+  - Dla Szwajcarii aplikacja pokazuje inflację i stopę SNB.
+- **Strach i chciwość:** osobno dla GPW i dla świata (VIX, S&P 500, spread obligacji śmieciowych – FRED), z rozbiciem na składniki i historią.
+- **Sygnały kupna i sprzedaży:** dla 20 indeksów GPW, z datą sygnału, RSI i testem historycznym reguły trendu na 5 latach danych.
+
 ## Jak uruchomić
 
 | Gdzie | Jak |

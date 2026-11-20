@@ -2,6 +2,7 @@
  * Network access to the free, official sources (no API keys). Used by scripts/fetch-data.ts (GitHub Actions, daily)
  * and by the Docker server. Polite: one request at a time with a pause; GUS allows 100 requests / 15 min anonymously.
  */
+import { parseFredCsv, parseSnbCsv } from './parse'
 import { BOND_PAGES, GUS, gusPeriod, gusSection, isXls, parseBondPage, parseGpwXls, parseGusCpi, parseNbpArchive, parseNbpFx, parseNbpGold, parseNbpRates, type GpwRow, type GusRow } from './parse'
 import type { BondCode } from '../core/bonds'
 import type { CpiPoint } from '../core/inflation'
@@ -85,4 +86,14 @@ export async function fetchOffer(): Promise<ReturnType<typeof parseBondPage>[]> 
     await sleep(300)
   }
   return out
+}
+
+/** An SNB data-portal series (cube + key), keyless CSV. */
+export async function fetchSnb(cube: string, key: string) {
+  return parseSnbCsv(await (await get(`https://data.snb.ch/api/cube/${cube}/data/csv/en`, 'text/csv')).text(), key)
+}
+
+/** A FRED series since `from` (YYYY-MM-DD), keyless CSV download. */
+export async function fetchFred(id: string, from: string) {
+  return parseFredCsv(await (await get(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}`, 'text/csv')).text())
 }

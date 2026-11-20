@@ -12,6 +12,8 @@ export default defineConfig({
   test: {
     include: ['tests/unit/**/*.test.{ts,tsx}'],
     environment: 'node',
+    // crypto (PBKDF2 310 000 rounds) and Monte Carlo runs are CPU-heavy: generous time limit, so a busy machine does not fail them
+    testTimeout: 30_000,
     coverage: {
       provider: 'v8',
       include: ['src/core/**', 'src/data/**'],

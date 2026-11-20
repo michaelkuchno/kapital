@@ -5,7 +5,6 @@ import { LineChart } from '../components/charts'
 import { project, fitAr1, DEFAULT_PARAMS } from '@core/montecarlo'
 import { requiredMonthly } from '@core/goals'
 import { latestCpi } from '@core/inflation'
-import { money } from '../i18n'
 
 /** yearly CPI values (December readings, or the latest month of each year) for the inflation model */
 export function yearlyCpi(cpi: { month: string; yoy: number }[]): number[] {
@@ -15,7 +14,7 @@ export function yearlyCpi(cpi: { month: string; yoy: number }[]): number[] {
 }
 
 export function Plan() {
-  const { t, lang, summary: s, market } = useApp()
+  const { t, summary: s, market, fmt, rate, cur } = useApp()
   const [years, setYears] = useState(10)
   const [contribution, setContribution] = useState(0)
   const [goal, setGoal] = useState(3_000_000)
@@ -29,18 +28,18 @@ export function Plan() {
     const ar = hist.length >= 4 ? fitAr1(hist) : { mean: 2.8, phi: 0.6, sigma: 1.5 }
     return project({
       start: { inflationBonds: s.byClass['bonds-inflation'], fixedBonds: s.byClass['bonds-fixed'], deposits: s.byClass.deposits + s.byClass.cash, equities: s.byClass.equities + s.byClass.other },
-      contribution: Number.isFinite(contribution) ? contribution : 0,
+      contribution: Number.isFinite(contribution) ? contribution * rate : 0, // entered in the display currency
       years: yrs,
       cpi: ar,
       cpiStart: cpiNow,
       paths: 2000,
       seed: 2026,
     })
-  }, [s, years, contribution, market, cpiNow])
+  }, [s, years, contribution, market, cpiNow, rate])
   const x = sim.years.map((y) => String(new Date().getFullYear() + y.year))
   const last = sim.years[sim.years.length - 1]
-  const monthly = Number.isFinite(goal) && Number.isFinite(goalYears) && Number.isFinite(goalRate) ? requiredMonthly(goal, s.total, goalYears, goalRate / 100) : NaN
-  const fmt = (v: number) => money(lang, v)
+  const monthly = Number.isFinite(goal) && Number.isFinite(goalYears) && Number.isFinite(goalRate) ? requiredMonthly(goal * rate, s.total, goalYears, goalRate / 100) : NaN
+
   return (
     <div className="space-y-4" data-testid="plan">
       <h1 className="text-2xl font-extrabold text-sea">{t('plan.title')}</h1>
@@ -49,7 +48,7 @@ export function Plan() {
           <Field label={t('plan.years')}>
             <Num value={years} onChange={setYears} testId="p-years" />
           </Field>
-          <Field label={t('plan.contribution')}>
+          <Field label={`${t('plan.contribution')} (${cur})`}>
             <Num value={contribution} onChange={setContribution} testId="p-contribution" />
           </Field>
         </div>
@@ -92,7 +91,7 @@ export function Plan() {
       </Card>
       <Card title={t('plan.goal')} testId="goal">
         <div className="grid gap-3 sm:grid-cols-3">
-          <Field label={t('plan.goalAmount')}>
+          <Field label={`${t('plan.goalAmount')} (${cur})`}>
             <Num value={goal} onChange={setGoal} testId="g-amount" />
           </Field>
           <Field label={t('plan.goalYears')}>

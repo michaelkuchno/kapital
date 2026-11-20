@@ -37,4 +37,7 @@ export const SECTOR_NAMES: Record<string, { pl: string; en: string; de: string }
   WIG20: { pl: '20 największych (WIG20)', en: 'Top 20 (WIG20)', de: 'Top 20 (WIG20)' },
   MWIG40: { pl: 'Średnie spółki (mWIG40)', en: 'Mid caps (mWIG40)', de: 'Mid Caps (mWIG40)' },
   SWIG80: { pl: 'Małe spółki (sWIG80)', en: 'Small caps (sWIG80)', de: 'Small Caps (sWIG80)' },
+  WIG20TR: { pl: 'WIG20 z dywidendami (WIG20TR)', en: 'WIG20 with dividends (WIG20TR)', de: 'WIG20 mit Dividenden (WIG20TR)' },
+  MWIG40TR: { pl: 'mWIG40 z dywidendami (mWIG40TR)', en: 'mWIG40 with dividends (mWIG40TR)', de: 'mWIG40 mit Dividenden (mWIG40TR)' },
+  'TBSP.INDEX': { pl: 'Obligacje skarbowe (TBSP)', en: 'Treasury bonds (TBSP)', de: 'Staatsanleihen (TBSP)' },
 }

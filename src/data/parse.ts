@@ -58,8 +58,33 @@ export function parseGpwXls(buf: Uint8Array): GpwRow[] {
 }
 
 /** Sector and broad indices tracked (names exactly as in the GPW file). There is no telecom index on the GPW any more. */
-export const INDICES = ['WIG', 'WIG20', 'MWIG40', 'SWIG80', 'WIG-BANKI', 'WIG-BUDOW', 'WIG-CHEMIA', 'WIG-ENERG', 'WIG-GORNIC', 'WIG-GRY', 'WIG-INFO', 'WIG-LEKI', 'WIG-MEDIA', 'WIG-MOTO', 'WIG-NRCHOM', 'WIG-ODZIEZ', 'WIG-PALIWA', 'WIG-SPOZYW'] as const
+export const INDICES = ['WIG', 'WIG20', 'MWIG40', 'SWIG80', 'WIG20TR', 'MWIG40TR', 'TBSP.INDEX', 'WIG-BANKI', 'WIG-BUDOW', 'WIG-CHEMIA', 'WIG-ENERG', 'WIG-GORNIC', 'WIG-GRY', 'WIG-INFO', 'WIG-LEKI', 'WIG-MEDIA', 'WIG-MOTO', 'WIG-NRCHOM', 'WIG-ODZIEZ', 'WIG-PALIWA', 'WIG-SPOZYW'] as const
 export const SECTORS = INDICES.filter((x) => x.startsWith('WIG-'))
+
+/** ---------- FRED (St. Louis Fed) CSV: "observation_date,VIXCLS" lines; "." marks a missing value ---------- */
+export function parseFredCsv(csv: string): { date: string; value: number }[] {
+  const out: { date: string; value: number }[] = []
+  for (const line of csv.trim().split(/\r?\n/).slice(1)) {
+    const [date, v] = line.split(',')
+    const n = Number(v)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date) && v !== '.' && v !== '' && Number.isFinite(n)) out.push({ date, value: n })
+  }
+  return out
+}
+/** ---------- SNB data portal CSV (semicolon, quoted, BOM): "Date";"D0";"Value" rows; key = D0 ---------- */
+export function parseSnbCsv(csv: string, key: string): { date: string; value: number }[] {
+  const out: { date: string; value: number }[] = []
+  for (const line of csv.replace(/^\uFEFF/, '').split(/\r?\n/)) {
+    const cells = line.split(';').map((c) => c.replace(/^"|"$/g, ''))
+    if (cells.length < 3 || cells[1] !== key || cells[2] === '') continue
+    const v = Number(cells[2])
+    if (/^\d{4}-\d{2}(-\d{2})?$/.test(cells[0]) && Number.isFinite(v)) out.push({ date: cells[0], value: v })
+  }
+  return out
+}
+export const SNB = { cpi: ['plkopr', 'VVP'], policy: ['snbgwdzid', 'LZ'], y10: ['rendoblim', '10J'] } as const
+
+export const FRED = { vix: 'VIXCLS', sp500: 'SP500', hy: 'BAMLH0A0HYM2' } as const
 
 /** ---------- GUS DBW: CPI y/y ---------- */
 export interface GusRow {
