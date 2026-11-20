@@ -43,10 +43,14 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('empty start: every screen opens, market data is loaded, disclaimer is shown @mobile', async ({ page }) => {
-  await expect(page.getByTestId('insight-empty')).toBeVisible()
+  await expect(page.getByTestId('quick-start')).toBeVisible()
   await expect(page.getByTestId('disclaimer')).toContainText('nie doradztwo inwestycyjne')
   await expect(page.getByTestId('data-date')).toContainText('Dane z')
-  for (const s of ['assets', 'market', 'bonds', 'plan', 'insights', 'settings', 'dashboard']) {
+  await page.getByTestId('start-add').click()
+  await expect(page.getByTestId('assets')).toBeVisible()
+  await page.getByTestId('nav-insights').click()
+  await expect(page.getByTestId('insight-empty')).toBeVisible()
+  for (const s of ['assets', 'market', 'bonds', 'plan', 'learn', 'insights', 'settings', 'dashboard']) {
     await page.getByTestId(`nav-${s}`).click()
     await expect(page.getByTestId(s)).toBeVisible()
     await expect(page).toHaveURL(new RegExp(`#${s}$`))
@@ -243,7 +247,7 @@ test('settings drive the insights (expenses → emergency fund, risk profile)', 
 
 test('phone layout: nothing wider than the screen on any page @mobile', async ({ page }) => {
   await addStock(page, 'SKARBIEC', '100', '3000')
-  for (const s of ['dashboard', 'assets', 'bonds', 'plan', 'insights', 'settings']) {
+  for (const s of ['dashboard', 'assets', 'bonds', 'plan', 'learn', 'insights', 'settings']) {
     await page.getByTestId(`nav-${s}`).click()
     await expect(page.getByTestId(s)).toBeVisible()
     const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)

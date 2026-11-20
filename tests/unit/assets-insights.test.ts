@@ -205,3 +205,27 @@ describe('insights', () => {
     expect(pct(0.12345, 2)).toBe(12.35)
   })
 })
+
+describe('gold and foreign currency', () => {
+  const m: MarketInputs = { ...market, goldPrice: 481.23, fx: { EUR: 4.4559, USD: 4.0613 } }
+  it('gold: grams × NBP price per gram; gain against the cost; liquid within days', () => {
+    const v = valueAsset({ id: 'g', kind: 'gold', grams: 31.1, cost: 12_000 }, m)
+    expect(v).toMatchObject({ value: 14_966.25, gain: 2_966.25, cls: 'other', liquidity: 'days', missingPrice: false })
+    expect(assetName({ id: 'g', kind: 'gold', grams: 31.1, cost: 1 })).toBe('Złoto 31.1 g')
+  })
+  it('currency: amount × NBP mid rate; cost optional', () => {
+    expect(valueAsset({ id: 'e', kind: 'fx', currency: 'eur', amount: 1000, cost: 4300 }, m)).toMatchObject({ value: 4455.9, gain: 155.9, cls: 'cash', liquidity: 'now' })
+    expect(valueAsset({ id: 'u', kind: 'fx', currency: 'USD', amount: 100 }, m)).toMatchObject({ value: 406.13, gain: 0 })
+    expect(assetName({ id: 'e', kind: 'fx', currency: 'eur', amount: 1000 })).toBe('EUR 1000')
+  })
+  it('no market data → cost used and flagged', () => {
+    expect(valueAsset({ id: 'g', kind: 'gold', grams: 10, cost: 5000 }, market)).toMatchObject({ value: 5000, gain: 0, missingPrice: true })
+    expect(valueAsset({ id: 'e', kind: 'fx', currency: 'JPY', amount: 1000, cost: 30 }, m)).toMatchObject({ value: 30, missingPrice: true })
+    expect(valueAsset({ id: 'e', kind: 'fx', currency: 'JPY', amount: 1000 }, m)).toMatchObject({ value: 0 })
+  })
+  it('the summary includes them', () => {
+    const s = summarize([{ id: 'g', kind: 'gold', grams: 31.1, cost: 12_000 }, { id: 'e', kind: 'fx', currency: 'EUR', amount: 1000 }], m)
+    expect(s.total).toBeCloseTo(14_966.25 + 4455.9, 2)
+    expect(s.byClass.cash).toBe(4455.9)
+  })
+})

@@ -44,7 +44,16 @@ async function main() {
   const days = missingDays(meta.lastTradingDay ?? null, today, BACKFILL)
   log(`GPW: ${days.length} weekday(s) to fetch`)
   const idx = new Map<string, StoredBar[]>()
-  const shares = new Map<string, { name: string; bars: StoredBar[] }>()
+  const shares = new Map<string, { name: string; type: 'share' | 'etf'; bars: StoredBar[] }>()
+  const addRows = (rows: Awaited<ReturnType<typeof fetchGpwDay>>, type: 'share' | 'etf') => {
+    for (const r of rows) {
+      if (!r.isin) continue
+      const e = shares.get(r.isin) ?? { name: r.name, type, bars: [] }
+      e.name = r.name
+      e.bars.push({ date: r.date, close: r.close, volume: r.volume })
+      shares.set(r.isin, e)
+    }
+  }
   let lastDay = meta.lastTradingDay
   for (const day of days) {
     try {
@@ -53,14 +62,9 @@ async function main() {
       for (const [name, bar] of groupRows(ir, 'name')) if ((INDICES as readonly string[]).includes(name)) idx.set(name, [...(idx.get(name) ?? []), bar])
       if (!SKIP_SHARES) {
         await sleep(250)
-        const sr = await fetchGpwDay('shares', day)
-        for (const r of sr) {
-          if (!r.isin) continue
-          const e = shares.get(r.isin) ?? { name: r.name, bars: [] }
-          e.name = r.name
-          e.bars.push({ date: r.date, close: r.close, volume: r.volume })
-          shares.set(r.isin, e)
-        }
+        addRows(await fetchGpwDay('shares', day), 'share')
+        await sleep(250)
+        addRows(await fetchGpwDay('etf', day), 'etf')
       }
       lastDay = !lastDay || day > lastDay ? day : lastDay
       await sleep(250)
@@ -74,13 +78,26 @@ async function main() {
     if (merged.length) writeFileSync(join(OUT, 'indices', `${fileKey(name)}.csv`), toCsv(merged.map(({ date, close }) => ({ date, close }))))
     allIdx.set(name, merged)
   }
-  const shareIndex = readJson<{ isin: string; name: string; last: number; date: string }[]>(join(OUT, 'shares', 'index.json'), [])
+  const shareIndex = readJson<{ isin: string; name: string; last: number; date: string; type?: 'share' | 'etf' }[]>(join(OUT, 'shares', 'index.json'), [])
+  // ETFs were added later: backfill their history once
+  if (!SKIP_SHARES && !shareIndex.some((s) => s.type === 'etf')) {
+    const etfDays = missingDays(null, today, BACKFILL)
+    log(`ETF backfill: ${etfDays.length} weekday(s)`)
+    for (const day of etfDays) {
+      try {
+        addRows(await fetchGpwDay('etf', day), 'etf')
+      } catch (e) {
+        errors.push(`etf ${day}: ${(e as Error).message}`)
+      }
+      await sleep(250)
+    }
+  }
   const byIsin = new Map(shareIndex.map((s) => [s.isin, s]))
-  for (const [isin, { name, bars }] of shares) {
+  for (const [isin, { name, type, bars }] of shares) {
     const merged = mergeBars(readSeries(join(OUT, 'shares'), isin), bars)
     writeFileSync(join(OUT, 'shares', `${fileKey(isin)}.csv`), toCsv(merged))
     const l = merged[merged.length - 1]
-    byIsin.set(isin, { isin, name, last: l.close, date: l.date })
+    byIsin.set(isin, { isin, name, last: l.close, date: l.date, type })
   }
   if (shares.size) writeFileSync(join(OUT, 'shares', 'index.json'), JSON.stringify([...byIsin.values()].sort((a, b) => a.name.localeCompare(b.name))))
   log(`GPW: indices ${allIdx.size}, shares updated ${shares.size}`)

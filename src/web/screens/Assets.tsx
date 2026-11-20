@@ -1,17 +1,21 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../state'
-import { db, newId } from '../db'
+import { db, newId, FAMILY, type StoredAsset } from '../db'
 import { Card, Money, Pct, Modal, Field, Num } from '../components/ui'
 import { assetName, type Asset, type ValuedAsset } from '@core/assets'
 import { BOND_CODES, BOND_SPECS, bondsFor, type BondValuation, type BondCode } from '@core/bonds'
 import type { DepositValuation } from '@core/deposits'
 import type { PositionValuation } from '@core/stocks'
-import { dateFmt, rate } from '../i18n'
+import { dateFmt, rate, money } from '../i18n'
+import { LineChart } from '../components/charts'
+import { loadSeries } from '../market'
+import type { Bar } from '@core/stats'
 import { today } from '@core/dates'
 
-const KINDS: Asset['kind'][] = ['bond', 'deposit', 'stock', 'cash', 'fund', 'other']
+export const KINDS: Asset['kind'][] = ['bond', 'deposit', 'stock', 'cash', 'gold', 'fx', 'fund', 'other']
+export const CURRENCIES = ['EUR', 'USD', 'CHF', 'GBP']
 
-function blank(kind: Asset['kind'], offer: { code: BondCode; firstRate: number; margin: number }[]): Asset {
+export function blank(kind: Asset['kind'], offer: { code: BondCode; firstRate: number; margin: number }[]): Asset {
   const id = newId()
   const d = today()
   switch (kind) {
@@ -29,6 +33,10 @@ function blank(kind: Asset['kind'], offer: { code: BondCode; firstRate: number; 
       return { id, kind, name: '', value: 0, cost: 0, equityShare: 1 }
     case 'other':
       return { id, kind, name: '', value: 0 }
+    case 'gold':
+      return { id, kind, grams: 31.1, cost: 0 }
+    case 'fx':
+      return { id, kind, currency: 'EUR', amount: 0 }
   }
 }
 
@@ -48,13 +56,17 @@ export function invalid(a: Asset): string | null {
       return !a.name.trim() ? 'f.name' : bad(a.value) ? 'f.value' : bad(a.cost) ? 'f.cost' : bad(a.equityShare) ? 'f.equityShare' : null
     case 'other':
       return !a.name.trim() ? 'f.name' : bad(a.value) ? 'f.value' : null
+    case 'gold':
+      return bad(a.grams, 0.01) ? 'f.grams' : bad(a.cost) ? 'f.cost' : null
+    case 'fx':
+      return !CURRENCIES.includes(a.currency) ? 'f.currency' : bad(a.amount, 0.01) ? 'f.amount' : a.cost !== undefined && bad(a.cost) ? 'f.cost' : null
   }
 }
 
-function AssetForm({ initial, onClose }: { initial: Asset; onClose: () => void }) {
-  const { t, market } = useApp()
-  const [a, setA] = useState<Asset>(initial)
-  const set = (p: Partial<Asset>) => setA((x) => ({ ...x, ...p }) as Asset)
+function AssetForm({ initial, onClose }: { initial: StoredAsset; onClose: () => void }) {
+  const { t, market, people } = useApp()
+  const [a, setA] = useState<StoredAsset>(initial)
+  const set = (p: Partial<Asset>) => setA((x) => ({ ...x, ...p }) as StoredAsset)
   const problem = invalid(a)
   const shares = market?.shares ?? []
   const save = async () => {
@@ -142,7 +154,9 @@ function AssetForm({ initial, onClose }: { initial: Asset; onClose: () => void }
               />
               <datalist id="gpw-shares">
                 {shares.map((s) => (
-                  <option key={s.isin} value={s.name} />
+                  <option key={s.isin} value={s.name}>
+                    {s.type === 'etf' ? 'ETF' : ''}
+                  </option>
                 ))}
               </datalist>
               {a.isin && <span className="text-xs text-stone-500">ISIN {a.isin}</span>}
@@ -183,6 +197,45 @@ function AssetForm({ initial, onClose }: { initial: Asset; onClose: () => void }
             </Field>
           </>
         )}
+        {a.kind === 'gold' && (
+          <>
+            <Field label={t('f.grams')}>
+              <Num value={a.grams} onChange={(v) => set({ grams: v })} testId="f-grams" />
+              <span className="text-xs text-stone-500">{t('f.gramsHint')}</span>
+            </Field>
+            <Field label={t('f.cost')}>
+              <Num value={a.cost} onChange={(v) => set({ cost: v })} testId="f-cost" />
+            </Field>
+          </>
+        )}
+        {a.kind === 'fx' && (
+          <>
+            <Field label={t('f.currency')}>
+              <select className="input" value={a.currency} onChange={(e) => set({ currency: e.target.value })} data-testid="f-currency">
+                {CURRENCIES.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label={t('f.amount')}>
+              <Num value={a.amount} onChange={(v) => set({ amount: v })} testId="f-amount" />
+            </Field>
+            <Field label={t('f.costPln')}>
+              <Num value={a.cost} onChange={(v) => set({ cost: Number.isFinite(v) ? v : undefined })} testId="f-cost" />
+            </Field>
+          </>
+        )}
+        {people.length > 1 && (
+          <Field label={t('people.owner')}>
+            <select className="input" value={a.profileId} onChange={(e) => setA((x) => ({ ...x, profileId: e.target.value }))} data-testid="f-owner">
+              {people.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
         <Field label={t('f.label')}>
           <input className="input" value={a.label ?? ''} onChange={(e) => set({ label: e.target.value || undefined })} data-testid="f-label" />
         </Field>
@@ -210,6 +263,39 @@ function AssetForm({ initial, onClose }: { initial: Asset; onClose: () => void }
   )
 }
 
+/** price history of a share / ETF (last year) with the average purchase price */
+function PriceChart({ isin, avg }: { isin: string; avg: number }) {
+  const { lang, t } = useApp()
+  const [bars, setBars] = useState<Bar[] | null>(null)
+  useEffect(() => {
+    void loadSeries(`shares/${isin}`).then((b) => setBars(b.slice(-252)))
+  }, [isin])
+  if (!bars?.length) return null
+  return (
+    <div className="mt-3" data-testid="price-chart">
+      <LineChart x={bars.map((b) => b.date)} height={160} lines={[{ values: bars.map((b) => b.close), color: '#0f3d3e', label: t('price') }, { values: bars.map(() => avg), color: '#c0392b', dash: '5 4', width: 1.5, label: t('chart.avgCost') }]} format={(v) => money(lang, v, 2)} />
+      <p className="text-xs text-stone-500">
+        <span className="text-sea">━</span> {t('price')} · <span className="text-down">╍</span> {t('chart.avgCost')}
+      </p>
+    </div>
+  )
+}
+
+/** value of the bonds at the end of each interest period until maturity (assumed inflation for the future) */
+function BondPath({ v }: { v: BondValuation }) {
+  const { lang, t } = useApp()
+  const capitalized = v.periods.length > 1 && v.periods[1].base !== 100
+  let acc = 0
+  const values = [v.nominal, ...v.periods.map((p) => (capitalized ? (p.base + p.interest) * v.count : ((acc += p.interest), (100 + acc) * v.count)))]
+  if (v.periods.length < 2) return null
+  return (
+    <div className="mt-3" data-testid="bond-chart">
+      <LineChart x={[v.periods[0].start, ...v.periods.map((p) => p.end)]} height={150} lines={[{ values, color: '#0f3d3e', label: t('value') }]} format={(x) => money(lang, x)} />
+      <p className="text-xs text-stone-500">{t('chart.bondPath')}</p>
+    </div>
+  )
+}
+
 function Detail({ it }: { it: ValuedAsset }) {
   const { t, lang, settings } = useApp()
   const assumeCpi = settings.assumeCpi
@@ -227,6 +313,9 @@ function Detail({ it }: { it: ValuedAsset }) {
         <Row k={t('bond.netIfRedeemed')} v={<Money v={v.netIfRedeemed} />} />
         <Row k={t('bond.maturityNet')} v={<Money v={v.maturityNet} />} />
         {v.assumedPeriods > 0 && <p className="col-span-full text-xs text-stone-500">{t('bond.assumed', { n: v.assumedPeriods, cpi: assumeCpi })}</p>}
+        <div className="col-span-full">
+          <BondPath v={v} />
+        </div>
       </dl>
     )
   }
@@ -250,9 +339,15 @@ function Detail({ it }: { it: ValuedAsset }) {
         <Row k={t('price')} v={<Money v={a.quantity ? v.value / a.quantity : 0} digits={2} />} />
         <Row k={t('stock.gain')} v={<Pct v={v.gainPct} />} />
         {v.gain < 0 && <Row k={t('stock.needed')} v={<Pct v={v.neededToBreakEven} />} />}
+        {a.isin && (
+          <div className="col-span-full">
+            <PriceChart isin={a.isin} avg={a.quantity ? a.cost / a.quantity : 0} />
+          </div>
+        )}
       </dl>
     )
   }
+  if ((a.kind === 'gold' || a.kind === 'fx') && it.missingPrice) return <p className="text-sm text-gold">{t('stock.missing')}</p>
   return null
 }
 function Row({ k, v }: { k: string; v: React.ReactNode }) {
@@ -265,8 +360,9 @@ function Row({ k, v }: { k: string; v: React.ReactNode }) {
 }
 
 export function Assets() {
-  const { t, summary, market } = useApp()
-  const [editing, setEditing] = useState<Asset | null>(null)
+  const { t, summary, market, owner, active, people } = useApp()
+  const [editing, setEditing] = useState<StoredAsset | null>(null)
+  const personOf = (a: Asset) => people.find((p) => p.id === (a as StoredAsset).profileId)
   const [picking, setPicking] = useState(false)
   const items = useMemo(() => [...summary.items].sort((x, y) => y.value - x.value), [summary])
   return (
@@ -285,11 +381,16 @@ export function Assets() {
           title={
             <span>
               {assetName(it.asset)} <span className="text-sm font-normal text-stone-500">· {t(`kind.${it.asset.kind}`)}</span>
+              {active === FAMILY && personOf(it.asset) && (
+                <span className="ml-2 rounded-full px-2 py-0.5 text-xs font-semibold text-white" style={{ background: personOf(it.asset)!.color }} data-testid="owner-badge">
+                  {personOf(it.asset)!.name}
+                </span>
+              )}
             </span>
           }
           action={
             <div className="flex gap-1">
-              <button type="button" className="btn-ghost !px-3 !py-1 text-sm" onClick={() => setEditing(it.asset)} data-testid={`edit-${it.asset.id}`}>
+              <button type="button" className="btn-ghost !px-3 !py-1 text-sm" onClick={() => setEditing(it.asset as StoredAsset)} data-testid={`edit-${it.asset.id}`}>
                 {t('edit')}
               </button>
               <button type="button" className="btn-ghost !px-3 !py-1 text-sm text-down" onClick={() => void db.assets.delete(it.asset.id)} data-testid={`delete-${it.asset.id}`}>
@@ -331,7 +432,7 @@ export function Assets() {
                 className="btn-ghost !justify-start !py-4 text-left"
                 onClick={() => {
                   setPicking(false)
-                  setEditing(blank(k, market?.offer ?? []))
+                  setEditing({ ...blank(k, market?.offer ?? []), profileId: owner } as StoredAsset)
                 }}
                 data-testid={`kind-${k}`}
               >

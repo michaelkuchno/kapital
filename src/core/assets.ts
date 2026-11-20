@@ -14,6 +14,10 @@ export type Asset =
   | { id: string; kind: 'cash'; label?: string; amount: number; rate?: number }
   | { id: string; kind: 'fund'; label?: string; name: string; value: number; cost: number; equityShare: number; ike?: boolean }
   | { id: string; kind: 'other'; label?: string; name: string; value: number }
+  /** physical gold in grams (valued at the NBP price of 1 g of gold, 999.9) */
+  | { id: string; kind: 'gold'; label?: string; grams: number; cost: number }
+  /** foreign currency cash, valued at the NBP mid rate */
+  | { id: string; kind: 'fx'; label?: string; currency: string; amount: number; cost?: number }
 
 export type AssetClass = 'bonds-inflation' | 'bonds-fixed' | 'deposits' | 'cash' | 'equities' | 'other'
 export type Liquidity = 'now' | 'days' | 'fee' | 'locked'
@@ -25,6 +29,10 @@ export interface MarketInputs {
   /** last price per share by ISIN or by name (upper case) */
   prices: ReadonlyMap<string, number>
   assume?: RateAssumption
+  /** NBP price of 1 g of gold, zł */
+  goldPrice?: number
+  /** NBP mid rates, zł per unit of currency */
+  fx?: Readonly<Record<string, number>>
 }
 
 export interface ValuedAsset {
@@ -74,6 +82,18 @@ export function valueAsset(a: Asset, m: MarketInputs): ValuedAsset {
       return { asset: a, cls: 'cash', liquidity: 'now', value: a.amount, netNow: a.amount, cost: a.amount, gain: 0 }
     case 'other':
       return { asset: a, cls: 'other', liquidity: 'locked', value: a.value, netNow: a.value, cost: a.value, gain: 0 }
+    case 'gold': {
+      const value = m.goldPrice ? round2(a.grams * m.goldPrice) : a.cost
+      const gain = m.goldPrice ? round2(value - a.cost) : 0
+      // investment gold is VAT-free; selling it after 6 months from purchase is free of PIT (art. 10 ust. 1 pkt 8 lit. d)
+      return { asset: a, cls: 'other', liquidity: 'days', value, netNow: value, cost: a.cost, gain, missingPrice: !m.goldPrice }
+    }
+    case 'fx': {
+      const r = m.fx?.[a.currency.toUpperCase()]
+      const value = r ? round2(a.amount * r) : (a.cost ?? 0)
+      const cost = a.cost ?? value
+      return { asset: a, cls: 'cash', liquidity: 'now', value, netNow: value, cost, gain: round2(value - cost), missingPrice: !r }
+    }
   }
 }
 
@@ -107,6 +127,10 @@ export function assetName(a: Asset): string {
       return a.name
     case 'cash':
       return 'Gotówka'
+    case 'gold':
+      return `Złoto ${a.grams} g`
+    case 'fx':
+      return `${a.currency.toUpperCase()} ${a.amount}`
   }
 }
 

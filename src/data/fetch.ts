@@ -25,10 +25,11 @@ async function get(url: string, accept = '*/*', tries = 3): Promise<Response> {
   throw last
 }
 
-/** GPW day file: 'shares' (type 10) or 'indices' (type 1); [] on non-trading days. date = YYYY-MM-DD */
-export async function fetchGpwDay(kind: 'shares' | 'indices', date: string): Promise<GpwRow[]> {
+const GPW_TYPE = { shares: 10, indices: 1, etf: 241 } as const
+/** GPW day file: shares (type 10), indices (type 1) or ETFs (type 241); [] on non-trading days. date = YYYY-MM-DD */
+export async function fetchGpwDay(kind: keyof typeof GPW_TYPE, date: string): Promise<GpwRow[]> {
   const [y, m, d] = date.split('-')
-  const r = await get(`https://www.gpw.pl/archiwum-notowan?fetch=1&type=${kind === 'shares' ? 10 : 1}&instrument=&date=${d}-${m}-${y}`)
+  const r = await get(`https://www.gpw.pl/archiwum-notowan?fetch=1&type=${GPW_TYPE[kind]}&instrument=&date=${d}-${m}-${y}`)
   const buf = new Uint8Array(await r.arrayBuffer())
   return isXls(buf) ? parseGpwXls(buf) : []
 }

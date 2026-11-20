@@ -15,7 +15,7 @@ export interface MarketData {
   offer: (OfferItem & { label?: string; sale?: string })[]
   offerMonth?: string
   summary: { date?: string; indices: IndexSummary[]; sectors: IndexSummary[] }
-  shares: { isin: string; name: string; last: number; date: string }[]
+  shares: { isin: string; name: string; last: number; date: string; type?: 'share' | 'etf' }[]
 }
 
 const base = () => `${import.meta.env.BASE_URL}data/`

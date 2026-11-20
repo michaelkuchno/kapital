@@ -1,6 +1,7 @@
 import { useApp } from '../state'
 import { Card, Money, Pct, Stat, InsightCard } from '../components/ui'
-import { Donut } from '../components/charts'
+import { Donut, LineChart } from '../components/charts'
+import { money } from '../i18n'
 import { latestCpi } from '@core/inflation'
 import type { AssetClass, Liquidity } from '@core/assets'
 import { SECTOR_NAMES } from '@data/summaries'
@@ -10,11 +11,34 @@ export const CLASS_COLORS: Record<AssetClass, string> = { 'bonds-inflation': '#0
 const LIQ: Liquidity[] = ['now', 'days', 'fee', 'locked']
 
 export function Dashboard() {
-  const { t, lang, summary: s, insights, market, go } = useApp()
+  const { t, lang, summary: s, insights, market, go, history } = useApp()
   const cpi = latestCpi(market?.cpi ?? [])
   const gainPct = s.cost ? s.gain / s.cost : 0
   const wig = market?.summary.indices.find((x) => x.code === 'WIG')
   const leaders = (market?.summary.sectors ?? []).slice(0, 3)
+  if (!s.items.length)
+    return (
+      <div className="space-y-4" data-testid="dashboard">
+        <section className="card text-center" data-testid="quick-start">
+          <h2 className="text-2xl font-extrabold text-sea">{t('start.title')}</h2>
+          <p className="mx-auto mt-2 max-w-xl text-stone-600">{t('start.lead')}</p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <button type="button" className="btn-primary" onClick={() => go('assets')} data-testid="start-add">
+              + {t('start.add')}
+            </button>
+            <button type="button" className="btn-ghost" onClick={() => go('learn')} data-testid="start-learn">
+              {t('start.learn')}
+            </button>
+            <button type="button" className="btn-ghost" onClick={() => go('market')}>
+              {t('nav.market')}
+            </button>
+          </div>
+        </section>
+        <p className="text-xs text-stone-500" data-testid="disclaimer">
+          {t('disclaimer')}
+        </p>
+      </div>
+    )
   return (
     <div className="space-y-4" data-testid="dashboard">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -94,6 +118,15 @@ export function Dashboard() {
         </Card>
       </div>
 
+      <Card title={t('dash.history')} testId="history">
+        {history.length >= 2 ? (
+          <LineChart x={history.map((h) => h.date)} height={170} lines={[{ values: history.map((h) => h.total), color: '#0f3d3e', width: 2.5, label: t('netWorth') }, { values: history.map((h) => h.cost), color: '#a8a29e', dash: '5 4', label: t('cost') }]} format={(v) => money(lang, v)} />
+        ) : (
+          <p className="text-sm text-stone-500" data-testid="history-empty">
+            {t('dash.historyEmpty')}
+          </p>
+        )}
+      </Card>
       <Card title={t('topInsights')} testId="top-insights" action={<button type="button" className="text-sm font-semibold text-sea-2 underline" onClick={() => go('insights')}>{t('allInsights')} →</button>}>
         <div className="grid gap-3 md:grid-cols-2">
           {insights.slice(0, 4).map((i) => (

@@ -2,7 +2,7 @@
 
 **PL** · [EN](#english) · [DE](#deutsch)
 
-Kapitał pokazuje cały majątek rodziny w jednym miejscu: obligacje skarbowe (EDO, COI, TOS, ROS, ROD…), lokaty, akcje z GPW, fundusze i gotówkę. Liczy wartość dziś, ile zostałoby na rękę po opłatach i podatku, porównuje z inflacją i aktualną ofertą obligacji, śledzi trendy sektorów giełdy i podpowiada, co warto rozważyć. Każda wskazówka ma źródło: badanie naukowe albo przepis.
+Kapitał pokazuje cały majątek rodziny w jednym miejscu: obligacje skarbowe (EDO, COI, TOS, ROS, ROD…), lokaty, akcje i 38 ETF-ów z GPW, złoto, waluty, fundusze i gotówkę. Każda osoba w rodzinie ma własny profil, a widok „Rodzina” sumuje wszystkich. Są wykresy (kursy, wartość obligacji do wykupu, majątek w czasie, scenariusze) i animowane lekcje (procent składany, inflacja, EDO, IKE, dywersyfikacja, trend). Liczy wartość dziś, ile zostałoby na rękę po opłatach i podatku, porównuje z inflacją i aktualną ofertą obligacji, śledzi trendy sektorów giełdy i podpowiada, co warto rozważyć. Każda wskazówka ma źródło: badanie naukowe albo przepis.
 
 > Kapitał to narzędzie do analizy i nauki, a nie doradztwo inwestycyjne. Decyzję podejmujesz Ty. Przy dużych kwotach warto porozmawiać z licencjonowanym doradcą.
 
@@ -76,7 +76,7 @@ Szczegóły i licencje znajdziesz w [docs/SOURCES.md](docs/SOURCES.md).
 ```
 npm ci
 npm run dev            # aplikacja
-npm test               # 144 testy jednostkowe (silnik i dane: 100 % linii)
+npm test               # 148 testów jednostkowych (silnik i dane: 100 % linii)
 npm run e2e            # testy w przeglądarce: komputer, Android, iPhone
 npm run data           # pobranie danych do public/data
 ```
