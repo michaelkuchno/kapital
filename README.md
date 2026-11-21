@@ -110,7 +110,7 @@ Szczegóły i licencje znajdziesz w [docs/SOURCES.md](docs/SOURCES.md).
 ```
 npm ci
 npm run dev            # aplikacja
-npm test               # 230 testów jednostkowych (silnik i dane: 100 % linii)
+npm test               # 228 testów jednostkowych (silnik i dane: 100 % linii)
 npm run e2e            # testy w przeglądarce: komputer, Android, iPhone
 npm run data           # pobranie danych do public/data
 ```
