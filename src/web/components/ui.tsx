@@ -47,7 +47,7 @@ export function Stat({ label, children, hint, testId }: { label: string; childre
   )
 }
 
-export function Modal({ title, onClose, children, testId }: { title: string; onClose: () => void; children: ReactNode; testId?: string }) {
+export function Modal({ title, onClose, children, testId, wide = false }: { title: string; onClose: () => void; children: ReactNode; testId?: string; wide?: boolean }) {
   const { t } = useApp()
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -56,7 +56,7 @@ export function Modal({ title, onClose, children, testId }: { title: string; onC
   }, [onClose])
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-auto rounded-t-3xl bg-white p-5 sm:rounded-3xl" onClick={(e) => e.stopPropagation()} data-testid={testId} role="dialog" aria-label={title}>
+      <div className={`max-h-[92vh] w-full ${wide ? 'max-w-4xl' : 'max-w-2xl'} overflow-auto rounded-t-3xl bg-white p-5 sm:rounded-3xl`} onClick={(e) => e.stopPropagation()} data-testid={testId} role="dialog" aria-label={title}>
         <div className="mb-4 flex items-center">
           <h2 className="text-xl font-bold text-sea">{title}</h2>
           <button type="button" className="btn-ghost ml-auto !px-3" onClick={onClose} aria-label={t('close')}>

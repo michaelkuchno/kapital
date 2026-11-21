@@ -145,7 +145,7 @@ test('form validation, decimals with a comma, edit and delete', async ({ page })
 test('market: 14 sectors ranked with trends, indices, a chart with averages @mobile', async ({ page }) => {
   await page.getByTestId('nav-market').click()
   const rows = page.getByTestId('sector-table').locator('tbody tr')
-  await expect(rows).toHaveCount(14)
+  await expect(rows).toHaveCount(15) // 14 GPW sectors + the Kapitał biotech basket
   for (const code of ['WIG-BANKI', 'WIG-ENERG', 'WIG-GRY', 'WIG-PALIWA']) await expect(page.getByTestId(`row-${code}`)).toBeVisible()
   await expect(page.getByTestId('index-table').locator('tbody tr')).toHaveCount(7)
   const states = await page.locator('[data-testid^="state-"]').allTextContents()
@@ -153,7 +153,7 @@ test('market: 14 sectors ranked with trends, indices, a chart with averages @mob
   await expect(page.getByTestId('recent-events')).toBeVisible()
   await page.getByTestId('row-WIG20').click()
   await expect(page.getByTestId('index-chart')).toBeVisible()
-  await expect(page.getByTestId('index-line').locator('path')).toHaveCount(3)
+  await expect.poll(() => page.getByTestId('index-line').locator('path').count()).toBeGreaterThanOrEqual(4) // price, SMA50, SMA200, Bollinger band (+ levels, pattern)
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('index-chart')).toBeHidden()
 })

@@ -11,6 +11,7 @@ import { LineChart } from '../components/charts'
 import { loadSeries } from '../market'
 import type { Bar } from '@core/stats'
 import { today } from '@core/dates'
+import { TechButton } from '../components/TechAnalysis'
 
 export const KINDS: Asset['kind'][] = ['bond', 'deposit', 'stock', 'cash', 'gold', 'fx', 'fund', 'other']
 export const CURRENCIES = ['EUR', 'USD', 'CHF', 'GBP']
@@ -316,6 +317,7 @@ function Detail({ it }: { it: ValuedAsset }) {
         <div className="col-span-full">
           <BondPath v={v} />
         </div>
+        <TaNote kind="bond" />
       </dl>
     )
   }
@@ -327,6 +329,7 @@ function Detail({ it }: { it: ValuedAsset }) {
         <Row k={t('dep.daysLeft')} v={String(v.daysLeft)} />
         <Row k={t('dep.endNet')} v={<Money v={v.endValueNet} digits={2} />} />
         <Row k={t('dep.break')} v={<Money v={v.breakValue} digits={2} />} />
+        <TaNote kind="deposit" />
       </dl>
     )
   }
@@ -342,13 +345,28 @@ function Detail({ it }: { it: ValuedAsset }) {
         {a.isin && (
           <div className="col-span-full">
             <PriceChart isin={a.isin} avg={a.quantity ? a.cost / a.quantity : 0} />
+            <div className="mt-2">
+              <TechButton path={`shares/${a.isin}`} name={a.name} shareName={a.name} testId="ta-open-asset" />
+            </div>
           </div>
         )}
+        {!a.isin && <TaNote kind="other" />}
       </dl>
     )
   }
   if ((a.kind === 'gold' || a.kind === 'fx') && it.missingPrice) return <p className="text-sm text-gold">{t('stock.missing')}</p>
-  return null
+  if (a.kind === 'gold') return <TechButton path="gold" name={t('search.gold')} testId="ta-open-gold" />
+  return <TaNote kind={a.kind} />
+}
+
+/** Why an asset without a market price has no technical analysis. */
+function TaNote({ kind }: { kind: string }) {
+  const { t } = useApp()
+  return (
+    <p className="col-span-full mt-1 text-xs text-stone-500" data-testid={`ta-na-${kind}`}>
+      📈 <b>{t('ta.na.title')}:</b> {t(`ta.na.${kind}`)}
+    </p>
+  )
 }
 function Row({ k, v }: { k: string; v: React.ReactNode }) {
   return (

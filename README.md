@@ -6,6 +6,17 @@ Kapitał pokazuje cały majątek rodziny w jednym miejscu: obligacje skarbowe (E
 
 > Kapitał to narzędzie do analizy i nauki, a nie doradztwo inwestycyjne. Decyzję podejmujesz Ty. Przy dużych kwotach warto porozmawiać z licencjonowanym doradcą.
 
+## Nowe w 1.3
+- **Analiza techniczna każdego instrumentu:** sektory, indeksy, każda spółka i każdy ETF z GPW, złoto oraz koszyk Biotechnologia. Zawiera:
+  - werdykt (od mocnej sprzedaży do mocnego kupna) z wyjaśnieniem, dlaczego taki jest,
+  - fazę rynku – hossa, bessa, korekta, odbicie (reguła 20%),
+  - wykresy: kurs ze średnimi 50/200, wstęgami Bollingera, wsparciem i oporem; RSI; MACD,
+  - formacje: głowa z ramionami (RGR) i odwrócona RGR, podwójny szczyt i dno, trójkąty, wybicia – z linią szyi, potwierdzeniem i zasięgiem,
+  - 15 wskaźników z „głosami”, wsparcia i opory, kanał trendu.
+  - Dostępna z Rynku (wyszukiwarka i tabele), z Majątku i z kart Doradcy. Obligacje, lokaty i gotówka mają wyjaśnienie, dlaczego analiza techniczna ich nie dotyczy.
+- **Propozycje sektorowe:** sektory w najsilniejszym trendzie, z możliwym odwróceniem i do ostrożności – według jawnych reguł.
+- **Głos instytucji:** stopa NBP i kierunek RPP, realna stopa, inflacja GUS, oferta obligacji MF, rekomendacje domów maklerskich z programu GPW (GPWPA, z linkami do raportów) i wyszukiwarka listy ostrzeżeń KNF.
+
 ## Nowe w 1.2
 - **Doradca ✨:** 5 kroków, po których dostajesz plan:
   - **Pytania:** rodzina, kto zarabia, dzieci, dochody i wydatki w PLN lub CHF, stan konta, planowane wydatki, 5 pytań o ryzyko, horyzont.
@@ -65,6 +76,8 @@ Wszystkie dane są aktualizowane codziennie przez GitHub Actions i przez serwer 
 | Inflacja (CPI r/r) | GUS (API DBW) |
 | Stopa referencyjna, kursy walut, złoto | NBP |
 | Aktualna oferta obligacji skarbowych | Ministerstwo Finansów (obligacjeskarbowe.pl) |
+| Raporty i rekomendacje analityków | GPW – program GPWPA (linki do raportów PDF na gpw.pl) |
+| Lista ostrzeżeń publicznych | KNF |
 
 Szczegóły i licencje znajdziesz w [docs/SOURCES.md](docs/SOURCES.md).
 
@@ -97,7 +110,7 @@ Szczegóły i licencje znajdziesz w [docs/SOURCES.md](docs/SOURCES.md).
 ```
 npm ci
 npm run dev            # aplikacja
-npm test               # 148 testów jednostkowych (silnik i dane: 100 % linii)
+npm test               # 230 testów jednostkowych (silnik i dane: 100 % linii)
 npm run e2e            # testy w przeglądarce: komputer, Android, iPhone
 npm run data           # pobranie danych do public/data
 ```

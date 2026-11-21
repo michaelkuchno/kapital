@@ -1,3 +1,4 @@
+import { TECH_DICTS } from './i18n-tech'
 export type Lang = 'pl' | 'en' | 'de'
 export const LANGS: Lang[] = ['pl', 'en', 'de']
 
@@ -1635,6 +1636,9 @@ const de: Dict = {
   'sev.ok': 'In Ordnung',
 }
 
+Object.assign(pl, TECH_DICTS.pl)
+Object.assign(en, TECH_DICTS.en)
+Object.assign(de, TECH_DICTS.de)
 export const DICTS: Record<Lang, Dict> = { pl, en, de }
 
 export function translate(lang: Lang, key: string, vars?: Record<string, string | number>): string {

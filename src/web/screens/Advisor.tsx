@@ -9,6 +9,7 @@ import { EVIDENCE } from '@core/evidence'
 import { latestCpi } from '@core/inflation'
 import { DEFAULT_PLANNER, type PlannerState } from '../planner-state'
 import { loadSeries } from '../market'
+import { TechButton } from '../components/TechAnalysis'
 import { yearlyCpi } from './Plan'
 import { dateFmt, money, percent } from '../i18n'
 import type { Signal } from '@core/signals'
@@ -47,15 +48,15 @@ function ProductCard({ item, residence }: { item: PlanItem; residence: PlanInput
   const p = productFor(item.id, residence)
   const [m, setM] = useState<LiveMetrics | null>(null)
   const [bars, setBars] = useState<{ date: string; close: number }[]>([])
+  const isin = p.gpwTicker ? market?.shares.find((s) => s.name === p.gpwTicker)?.isin : undefined
+  const path = p.series ?? (isin ? `shares/${isin}` : undefined)
   useEffect(() => {
-    const isin = p.gpwTicker ? market?.shares.find((s) => s.name === p.gpwTicker)?.isin : undefined
-    const path = p.series ?? (isin ? `shares/${isin}` : undefined)
     if (!path) return
     void loadSeries(path).then((b) => {
       setBars(b.slice(-252))
       setM(liveMetrics(b))
     })
-  }, [p, market])
+  }, [path])
   return (
     <article className="rise rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5" style={{ borderTop: `5px solid ${BUCKET_COLOR[item.bucket]}` }} data-testid={`plan-item-${item.id}`}>
       <div className="flex flex-wrap items-baseline gap-2">
@@ -133,6 +134,11 @@ function ProductCard({ item, residence }: { item: PlanItem; residence: PlanInput
       {bars.length > 30 && (
         <div className="mt-2">
           <LineChart x={bars.map((b) => b.date)} height={90} lines={[{ values: bars.map((b) => b.close), color: BUCKET_COLOR[item.bucket], width: 1.8 }]} format={(v) => money(lang, v, 2)} />
+        </div>
+      )}
+      {path && bars.length > 30 && (
+        <div className="mt-2">
+          <TechButton path={path} name={p.gpwTicker ?? t(`prod.${p.id}`)} testId={`ta-open-${item.id}`} />
         </div>
       )}
       <details className="mt-2 text-xs text-stone-600">

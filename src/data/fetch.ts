@@ -3,7 +3,7 @@
  * and by the Docker server. Polite: one request at a time with a pause; GUS allows 100 requests / 15 min anonymously.
  */
 import { parseFredCsv, parseSnbCsv } from './parse'
-import { BOND_PAGES, GUS, gusPeriod, gusSection, isXls, parseBondPage, parseGpwXls, parseGusCpi, parseNbpArchive, parseNbpFx, parseNbpGold, parseNbpRates, type GpwRow, type GusRow } from './parse'
+import { BOND_PAGES, GUS, gusPeriod, gusSection, isXls, parseBondPage, parseGpwXls, parseGusCpi, parseKnf, parseNbpArchive, parseNbpFx, parseNbpGold, parseNbpRates, parsePwpa, parseReportRating, type BrokerRating, type GpwRow, type GusRow, type KnfWarning, type PwpaReport } from './parse'
 import type { BondCode } from '../core/bonds'
 import type { CpiPoint } from '../core/inflation'
 
@@ -96,4 +96,52 @@ export async function fetchSnb(cube: string, key: string) {
 /** A FRED series since `from` (YYYY-MM-DD), keyless CSV download. */
 export async function fetchFred(id: string, from: string) {
   return parseFredCsv(await (await get(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}`, 'text/csv')).text())
+}
+
+/** The newest reports of the GPW analytical coverage programme (the same list as on gpw.pl/gpwpa). */
+export async function fetchPwpa(limit = 300): Promise<PwpaReport[]> {
+  const body = new URLSearchParams({ action: 'GPWPWPA', start: 'list', ajax: '1', limit: String(limit), offset: '0', sort: 'file_date', dir: 'desc' })
+  const r = await fetch('https://www.gpw.pl/ajaxindex.php', { method: 'POST', headers: { 'user-agent': UA, 'content-type': 'application/x-www-form-urlencoded' }, body, signal: AbortSignal.timeout(60_000) })
+  if (!r.ok) throw new Error(`gpwpa ${r.status}`)
+  const rows = parsePwpa(await r.text())
+  if (!rows.length) throw new Error('gpwpa: no rows')
+  return rows
+}
+
+/** KNF public warning list (entities reported to the prosecutor). */
+export async function fetchKnf(): Promise<KnfWarning[]> {
+  const r = await get('https://www.knf.gov.pl/dla_konsumenta/ostrzezenia_publiczne', 'text/html')
+  const rows = parseKnf(await r.text())
+  if (rows.length < 50) throw new Error(`knf: only ${rows.length} rows`)
+  return rows
+}
+
+/**
+ * Read the rating from the first page of each new update/initiation
+ * report. Results are kept in `known` (by PDF path), so every report is downloaded only once.
+ */
+export async function fetchPwpaRatings(reports: readonly PwpaReport[], known: ReadonlyMap<string, { rating?: BrokerRating }>, max = 60): Promise<Map<string, { rating?: BrokerRating }>> {
+  const out = new Map(known)
+  const todo = reports.filter((r) => /aktualizuj|inicjuj/i.test(r.type) && !out.has(r.pdf)).slice(0, max)
+  if (!todo.length) return out
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  for (const r of todo) {
+    try {
+      const res = await get(`https://www.gpw.pl${encodeURI(r.pdf)}`, 'application/pdf')
+      const doc = await pdfjs.getDocument({ data: new Uint8Array(await res.arrayBuffer()), isEvalSupported: false, verbosity: 0 }).promise
+      const page = await doc.getPage(1)
+      const text = (await page.getTextContent()).items.map((i) => ('str' in i ? i.str : '')).join(' ')
+      out.set(r.pdf, parseReportRating(text))
+      await doc.destroy()
+    } catch {
+      out.set(r.pdf, {})
+    }
+    await sleep(400)
+  }
+  return out
+}
+
+/** NBP gold price for a date range (the API allows at most 93 days per request). */
+export async function fetchGoldRange(from: string, to: string) {
+  return parseNbpGold(await (await get(`https://api.nbp.pl/api/cenyzlota/${from}/${to}?format=json`, 'application/json')).json())
 }

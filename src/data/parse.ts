@@ -191,3 +191,79 @@ export function parseNbpFx(json: unknown): { date: string; rates: Record<string,
 export function parseNbpGold(json: unknown): { date: string; price: number }[] {
   return (json as { data: string; cena: number }[]).map((x) => ({ date: x.data, price: x.cena }))
 }
+
+/** ---------- GPW analytical coverage programme (GPWPA): HTML rows of the report list ---------- */
+export interface PwpaReport {
+  date: string
+  /** GPW ticker, e.g. "SLV" */
+  code: string
+  company: string
+  /** path of the PDF on gpw.pl, e.g. "/pub/pwpa/20261120_pko_bank_polski_slv_pl_aw.pdf" */
+  pdf: string
+  type: string
+  broker: string
+}
+const decode = (s: string) =>
+  s
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&#0?39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .trim()
+export function parsePwpa(html: string): PwpaReport[] {
+  const out: PwpaReport[] = []
+  for (const row of html.split(/<tr[\s>]/).slice(1)) {
+    const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((m) => m[1])
+    if (cells.length < 6) continue
+    const date = decode(cells[0])
+    const pdf = cells[3].match(/href="([^"]+\.pdf)"/)?.[1]
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !pdf) continue
+    out.push({ date, code: decode(cells[1]), company: decode(cells[2]), pdf, type: decode(cells[4]), broker: decode(cells[5]) })
+  }
+  return out
+}
+
+/** ---------- KNF public warning list: one entry per table row ---------- */
+export interface KnfWarning {
+  name: string
+  /** KRS / NIP / REGON or a note such as "brak danych" */
+  id: string
+  info: string
+}
+export function parseKnf(html: string): KnfWarning[] {
+  const out: KnfWarning[] = []
+  for (const table of html.split('warning-list-table').slice(1)) {
+    const body = table.split('</table>')[0]
+    for (const row of body.split(/<tr[\s>]/).slice(1)) {
+      const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((m) => decode(m[1]))
+      if (cells.length < 3 || !cells[1]) continue
+      out.push({ name: cells[1], id: cells[2], info: cells[cells.length - 1] ?? '' })
+    }
+  }
+  return out
+}
+
+/** ---------- broker recommendation on the first page of a research report (best effort) ---------- */
+export type BrokerRating = 'buy' | 'accumulate' | 'hold' | 'reduce' | 'sell'
+const RATING_WORDS: [RegExp, BrokerRating][] = [
+  [/^(kupuj|buy|outperform|overweight)$/i, 'buy'],
+  [/^(akumuluj|accumulate)$/i, 'accumulate'],
+  [/^(trzymaj|neutralnie|hold|neutral)$/i, 'hold'],
+  [/^(redukuj|reduce)$/i, 'reduce'],
+  [/^(sprzedaj|sell|underperform|underweight)$/i, 'sell'],
+]
+const RATING_RE = /\b(KUPUJ|AKUMULUJ|TRZYMAJ|NEUTRALNIE|REDUKUJ|SPRZEDAJ|BUY|ACCUMULATE|HOLD|REDUCE|SELL|OUTPERFORM|UNDERPERFORM|NEUTRAL|OVERWEIGHT|UNDERWEIGHT)\b/i
+/** Only the rating is read: target prices are often split into single digits by the PDF text layer, so they are not trusted. */
+export function parseReportRating(text: string): { rating?: BrokerRating } {
+  const t = text.replace(/\s+/g, ' ')
+  // the rating stated next to the word "rekomendacja"/"recommendation" wins; otherwise the first rating word on the page
+  const near = t.match(new RegExp(`(?:rekomendacj\\w*|recommendation)[^.]{0,60}?${RATING_RE.source}`, 'i'))
+  const word = near?.[1] ?? t.match(RATING_RE)?.[1]
+  const rating = word ? RATING_WORDS.find(([re]) => re.test(word))?.[1] : undefined
+  return { rating }
+}

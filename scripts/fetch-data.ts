@@ -6,14 +6,15 @@
  */
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { fetchCpi, fetchSnb, fetchFred, fetchFx, fetchGold, fetchGpwDay, fetchNbpRates, fetchOffer, sleep } from '../src/data/fetch'
+import { fetchCpi, fetchSnb, fetchFred, fetchFx, fetchGold, fetchGpwDay, fetchKnf, fetchNbpRates, fetchGoldRange, fetchOffer, fetchPwpa, fetchPwpaRatings, sleep } from '../src/data/fetch'
 import { FRED, SNB } from '../src/data/parse'
 import { analyzeMarket } from '../src/data/analysis'
 import { INDICES } from '../src/data/parse'
-import { fileKey, fromCsv, groupRows, mergeBars, missingDays, toCsv, type StoredBar } from '../src/data/store'
+import { fileKey, fromCsv, groupRows, isFresh, mergeBars, mergeDated, missingDays, toCsv, type StoredBar } from '../src/data/store'
 import { summarizeIndices } from '../src/data/summaries'
 import { shiftMonth } from '../src/core/dates'
 import type { CpiPoint } from '../src/core/inflation'
+import type { BrokerRating, PwpaReport } from '../src/data/parse'
 
 const arg = (name: string, dflt: string) => {
   const i = process.argv.indexOf(`--${name}`)
@@ -170,8 +171,28 @@ async function main() {
   }
   log('NBP, FX, gold …')
   const nbp = await fetchNbpRates().catch((e) => (errors.push(`nbp: ${e.message}`), readJson(join(OUT, 'macro.json'), {} as Record<string, unknown>).nbp))
-  const fx = await fetchFx().catch((e) => (errors.push(`fx: ${e.message}`), undefined))
-  const gold = await fetchGold().catch((e) => (errors.push(`gold: ${e.message}`), undefined))
+  const prevMacro = readJson<{ fx?: { date: string }; gold?: { date: string; price: number }[] }>(join(OUT, 'macro.json'), {})
+  // the NBP API once answered with data from 2023: stale answers are rejected and the previous values kept
+  let fx = await fetchFx().catch((e) => (errors.push(`fx: ${e.message}`), undefined))
+  if (fx && !isFresh(fx.date, today)) {
+    errors.push(`fx: stale answer ${fx.date}`)
+    fx = prevMacro.fx as typeof fx
+  }
+  const goldNow = await fetchGold().catch((e) => (errors.push(`gold: ${e.message}`), []))
+  if (goldNow.length && !isFresh(goldNow.at(-1)!.date, today)) errors.push(`gold: stale answer ${goldNow.at(-1)!.date}`)
+  const goldSince = new Date(Date.now() - 3 * 365.25 * 86_400_000).toISOString().slice(0, 10)
+  let gold = mergeDated((prevMacro.gold ?? []).filter((p) => p.date >= goldSince), goldNow.filter((p) => isFresh(p.date, today, 120)), goldSince)
+  // three years of gold history (once), in 90-day steps, for the technical analysis of gold
+  if (!gold.length || gold[0].date > new Date(Date.parse(goldSince) + 30 * 86_400_000).toISOString().slice(0, 10)) {
+    const extra: { date: string; price: number }[] = []
+    for (let d = Date.parse(goldSince); d < Date.now(); d += 90 * 86_400_000) {
+      const a = new Date(d).toISOString().slice(0, 10)
+      const b = new Date(Math.min(Date.now(), d + 89 * 86_400_000)).toISOString().slice(0, 10)
+      extra.push(...(await fetchGoldRange(a, b).catch((e) => (errors.push(`gold ${a}: ${e.message}`), []))))
+      await sleep(300)
+    }
+    gold = mergeDated(extra, gold, goldSince)
+  }
   // Switzerland (SNB): CPI y/y, policy rate, 10-year Confederation bond yield
   log('SNB …')
   const snb = async (cube: string, key: string) => fetchSnb(cube, key).catch((e) => (errors.push(`snb ${cube}: ${e.message}`), []))
@@ -189,6 +210,27 @@ async function main() {
     log(`offer: ${offer.map((o) => `${o.series} ${o.firstRate}%/${o.margin}`).join(', ')}`)
   } catch (e) {
     errors.push(`offer: ${(e as Error).message}`)
+  }
+
+  // 5. institutions: GPW analytical coverage programme (report list) and the KNF public warning list
+  log('GPWPA, KNF …')
+  try {
+    const pwpa = await fetchPwpa()
+    const before = readJson<{ reports?: (PwpaReport & { rating?: BrokerRating; read?: boolean })[] }>(join(OUT, 'pwpa.json'), {})
+    const known = new Map((before.reports ?? []).filter((r) => r.read).map((r) => [r.pdf, { rating: r.rating }]))
+    const ratings = await fetchPwpaRatings(pwpa, known)
+    const reports = pwpa.map((r) => (ratings.has(r.pdf) ? { ...r, ...ratings.get(r.pdf), read: true } : r))
+    writeFileSync(join(OUT, 'pwpa.json'), JSON.stringify({ updatedAt: today, reports }))
+    log(`GPWPA: ${pwpa.length} reports, newest ${pwpa[0]?.date}`)
+  } catch (e) {
+    errors.push(`gpwpa: ${(e as Error).message}`)
+  }
+  try {
+    const knf = await fetchKnf()
+    writeFileSync(join(OUT, 'knf.json'), JSON.stringify({ updatedAt: today, warnings: knf }))
+    log(`KNF: ${knf.length} warnings`)
+  } catch (e) {
+    errors.push(`knf: ${(e as Error).message}`)
   }
 
   writeFileSync(join(OUT, 'meta.json'), JSON.stringify({ updatedAt: new Date().toISOString(), lastTradingDay: lastDay, errors, files: readdirSync(join(OUT, 'indices')).length }, null, 1))

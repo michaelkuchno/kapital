@@ -59,3 +59,16 @@ export function missingDays(lastStored: string | null, to: string, backfillDays:
   }
   return out
 }
+
+/** Is a data point recent enough (at most `maxDays` calendar days before `today`)? */
+export function isFresh(date: string | undefined, today: string, maxDays = 10): boolean {
+  if (!date) return false
+  return (Date.parse(today) - Date.parse(date)) / 86_400_000 <= maxDays
+}
+
+/** Merge dated points (newer values win), sorted by date, optionally keeping only points on or after `since`. */
+export function mergeDated<T extends { date: string }>(old: readonly T[], fresh: readonly T[], since = ''): T[] {
+  const m = new Map(old.map((p) => [p.date, p]))
+  for (const p of fresh) m.set(p.date, p)
+  return [...m.values()].filter((p) => p.date >= since).sort((a, b) => a.date.localeCompare(b.date))
+}

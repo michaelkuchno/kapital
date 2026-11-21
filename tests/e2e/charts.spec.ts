@@ -165,6 +165,16 @@ async function everyScreen(page: Page, label: string, isMobile: boolean): Promis
     await expect(page.getByTestId('index-chart')).toBeHidden()
   }
 
+  // any share from the search: the full technical analysis with all its charts
+  await page.getByTestId('ta-search-input').fill('PKOBP')
+  await page.getByTestId('ta-search-results').getByRole('button').first().click()
+  await expect(page.getByTestId('ta-macd').locator('path').first()).toBeVisible()
+  await check('market share PKOBP')
+  await page.getByTestId('ta-period-6m').click()
+  await check('market share PKOBP 6m')
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('tech-modal')).toBeHidden()
+
   await go('bonds')
   await check('bonds')
   await go('plan')

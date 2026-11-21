@@ -9,25 +9,45 @@ export interface Line {
   label?: string
 }
 
-export function LineChart({ x, lines, band, height = 220, testId, format = (v: number) => v.toFixed(0) }: { x: string[]; lines: Line[]; band?: { lo: number[]; hi: number[]; color: string }; height?: number; testId?: string; format?: (v: number) => string }) {
+export interface Marker {
+  i: number
+  value: number
+  label: string
+  color: string
+}
+
+/**
+ * Line chart. Optional: a shaded band (e.g. Bollinger Bands; null values are skipped), a value axis with three
+ * labelled grid lines, a fixed value range (e.g. RSI 0–100) and markers (e.g. the shoulders and the head of a pattern).
+ * The tooltip follows the mouse or a finger.
+ */
+export function LineChart({ x, lines, band, height = 220, testId, format = (v: number) => v.toFixed(0), axis = false, range, markers = [] }: { x: string[]; lines: Line[]; band?: { lo: (number | null)[]; hi: (number | null)[]; color: string }; height?: number; testId?: string; format?: (v: number) => string; axis?: boolean; range?: [number, number]; markers?: Marker[] }) {
   const [hover, setHover] = useState<number | null>(null)
   const W = 640
   const H = height
   const P = { l: 8, r: 8, t: 10, b: 22 }
-  const all = [...lines.flatMap((l) => l.values), ...(band ? [...band.lo, ...band.hi] : [])].filter((v): v is number => v !== null && Number.isFinite(v))
+  const all = [...lines.flatMap((l) => l.values), ...(band ? [...band.lo, ...band.hi] : []), ...markers.map((m) => m.value)].filter((v): v is number => v !== null && Number.isFinite(v))
   if (!all.length || x.length < 2) return <div className="flex h-40 items-center justify-center text-stone-400">–</div>
-  let min = Math.min(...all)
-  let max = Math.max(...all)
+  let min = range ? range[0] : Math.min(...all)
+  let max = range ? range[1] : Math.max(...all)
   if (min === max) {
     min -= 1
     max += 1
   }
-  const pad = (max - min) * 0.06
-  min -= pad
-  max += pad
+  if (!range) {
+    const pad = (max - min) * 0.06
+    min -= pad
+    max += pad
+  }
   const sx = (i: number) => P.l + (i / (x.length - 1)) * (W - P.l - P.r)
-  const sy = (v: number) => P.t + (1 - (v - min) / (max - min)) * (H - P.t - P.b)
-  const path = (vals: (number | null)[]) => {
+  const sy = (v: number) => P.t + (1 - (Math.min(max, Math.max(min, v)) - min) / (max - min)) * (H - P.t - P.b)
+  const grid = axis ? [max - (max - min) * 0.1, (max + min) / 2, min + (max - min) * 0.1] : []
+  const move = (e: React.PointerEvent<SVGSVGElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    const i = Math.round(((e.clientX - r.left) / r.width) * (x.length - 1))
+    setHover(Math.max(0, Math.min(x.length - 1, i)))
+  }
+  const path = (vals: readonly (number | null)[]) => {
     let d = ''
     let pen = false
     vals.forEach((v, i) => {
@@ -38,20 +58,41 @@ export function LineChart({ x, lines, band, height = 220, testId, format = (v: n
     return d
   }
   const ticks = [...new Set([0, Math.floor((x.length - 1) / 2), x.length - 1])]
-  const bandD = band ? `${path(band.hi)}${band.lo.map((_v, i) => `L${sx(band.lo.length - 1 - i).toFixed(1)},${sy(band.lo[band.lo.length - 1 - i]).toFixed(1)}`).join('')}Z` : ''
+  // band: only where both edges are known
+  let bandD = ''
+  if (band) {
+    const idx = band.lo.map((_v, i) => i).filter((i) => band.lo[i] != null && band.hi[i] != null && Number.isFinite(band.lo[i]!) && Number.isFinite(band.hi[i]!))
+    if (idx.length > 1) bandD = `M${idx.map((i) => `${sx(i).toFixed(1)},${sy(band.hi[i]!).toFixed(1)}`).join('L')}L${[...idx].reverse().map((i) => `${sx(i).toFixed(1)},${sy(band.lo[i]!).toFixed(1)}`).join('L')}Z`
+  }
   return (
     <div className="relative" data-testid={testId}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" onMouseLeave={() => setHover(null)} onMouseMove={(e) => {
-        const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect()
-        const i = Math.round(((e.clientX - r.left) / r.width) * (x.length - 1))
-        setHover(Math.max(0, Math.min(x.length - 1, i)))
-      }} role="img">
-        {band && bandD.startsWith('M') && <path d={bandD} fill={band.color} opacity={0.25} />}
+      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full touch-pan-y" onPointerLeave={() => setHover(null)} onPointerMove={move} onPointerDown={move} role="img">
+        {grid.map((v, k) => (
+          <g key={`g${k}`}>
+            <line x1={P.l} x2={W - P.r} y1={sy(v)} y2={sy(v)} stroke="#e7e5e4" />
+            <text x={W - P.r} y={sy(v) - 3} fontSize="10" fill="#78716c" textAnchor="end" stroke="white" strokeWidth="3" paintOrder="stroke">
+              {format(v)}
+            </text>
+          </g>
+        ))}
+        {bandD && <path d={bandD} fill={band!.color} opacity={0.25} />}
         {lines.map((l, k) => {
           const d = path(l.values)
           // a line with no points yet (e.g. an animation at its start) is not drawn at all
           return d ? <path key={k} d={d} fill="none" stroke={l.color} strokeWidth={l.width ?? 2} strokeDasharray={l.dash} /> : null
         })}
+        {markers
+          .filter((m) => m.i >= 0 && m.i < x.length && Number.isFinite(m.value))
+          .map((m, k) => (
+            <g key={`m${k}`}>
+              <circle cx={sx(m.i)} cy={sy(m.value)} r="4" fill={m.color} stroke="white" strokeWidth="1.5" />
+              {m.label && (
+                <text x={Math.min(W - P.r - 6, Math.max(P.l + 6, sx(m.i)))} y={Math.max(P.t + 10, sy(m.value) - 7)} fontSize="11" fontWeight="700" fill={m.color} textAnchor="middle" stroke="white" strokeWidth="3" paintOrder="stroke">
+                  {m.label}
+                </text>
+              )}
+            </g>
+          ))}
         {ticks.map((i) => (
           <text key={i} x={sx(i)} y={H - 6} fontSize="11" fill="#78716c" textAnchor={i === 0 ? 'start' : i === x.length - 1 ? 'end' : 'middle'}>
             {x[i]}
@@ -72,6 +113,39 @@ export function LineChart({ x, lines, band, height = 220, testId, format = (v: n
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Horizontal strip of bull (green) and bear (red) market periods over the dates of a chart. Plain HTML with a fixed
+ * height (not a scaled SVG), so the labels stay readable on a phone.
+ */
+export function PhaseBar({ x, segments, labels, testId }: { x: string[]; segments: { kind: 'bull' | 'bear'; from: string; to: string }[]; labels: { bull: string; bear: string }; testId?: string }) {
+  if (x.length < 2) return null
+  const first = x[0]
+  const last = x[x.length - 1]
+  const pos = (d: string) => {
+    if (d <= first) return 0
+    if (d >= last) return x.length - 1
+    let lo = 0
+    let hi = x.length - 1
+    while (lo < hi) {
+      const m = (lo + hi) >> 1
+      if (x[m] < d) lo = m + 1
+      else hi = m
+    }
+    return lo
+  }
+  const pct = (i: number) => (i / (x.length - 1)) * 100
+  const parts = segments.filter((s) => s.to >= first && s.from <= last).map((s) => ({ ...s, a: pct(pos(s.from)), b: pct(pos(s.to)) }))
+  return (
+    <div className="relative h-6 w-full overflow-hidden rounded bg-stone-100" role="img" aria-label={parts.map((p) => `${labels[p.kind]} ${p.from} – ${p.to}`).join(', ')} data-testid={testId}>
+      {parts.map((p, k) => (
+        <div key={k} className={`absolute inset-y-0 flex items-center justify-center overflow-hidden text-xs font-bold whitespace-nowrap text-white ${p.kind === 'bull' ? 'bg-up' : 'bg-down'}`} style={{ left: `${p.a}%`, width: `${Math.max(0.3, p.b - p.a)}%` }} data-phase={p.kind}>
+          {p.b - p.a > 14 ? labels[p.kind] : ''}
+        </div>
+      ))}
     </div>
   )
 }

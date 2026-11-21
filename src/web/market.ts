@@ -82,3 +82,27 @@ export async function serverAvailable(): Promise<boolean> {
     return false
   }
 }
+
+export interface Institutions {
+  pwpa: { updatedAt?: string; reports: (import('@data/parse').PwpaReport & { rating?: import('@data/parse').BrokerRating; read?: boolean })[] }
+  knf: { updatedAt?: string; warnings: import('@data/parse').KnfWarning[] }
+}
+let inst: Promise<Institutions> | null = null
+/** GPW analytical reports and the KNF warning list (loaded once, only when a screen needs them). */
+export function loadInstitutions(): Promise<Institutions> {
+  if (!inst)
+    inst = Promise.all([json<Institutions['pwpa']>('pwpa.json', { reports: [] }), json<Institutions['knf']>('knf.json', { warnings: [] })]).then(([pwpa, knf]) => ({ pwpa: { ...pwpa, reports: pwpa.reports ?? [] }, knf: { ...knf, warnings: knf.warnings ?? [] } }))
+  return inst
+}
+
+/** Members of the Kapitał biotech basket (GPW has no biotech index): ISINs of the shares. */
+export const BIOTECH = ['PLMBION00016', 'PLSLVCR00029', 'PLSELVT00013', 'PLCPTRT00014', 'PLCLNPH00015', 'PLONCTH00011', 'PLPLTRG00038', 'PLBCLTX00019', 'PLBIOTN00029']
+/** Load an instrument: an index/share path, the biotech basket ("basket/KAP-BIOTECH") or gold ("gold"). */
+export async function loadInstrument(path: string, market?: MarketData | null): Promise<Bar[]> {
+  if (path === 'basket/KAP-BIOTECH') {
+    const { basket } = await import('@core/technical')
+    return basket(await Promise.all(BIOTECH.map((i) => loadSeries(`shares/${i}`))))
+  }
+  if (path === 'gold') return (market?.gold ?? []).map((g) => ({ date: g.date, close: g.price }))
+  return loadSeries(path)
+}
