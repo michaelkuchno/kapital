@@ -37,7 +37,8 @@ export function LineChart({ x, lines, band, height = 220, testId, format = (v: n
     })
     return d
   }
-  const ticks = [0, Math.floor((x.length - 1) / 2), x.length - 1]
+  const ticks = [...new Set([0, Math.floor((x.length - 1) / 2), x.length - 1])]
+  const bandD = band ? `${path(band.hi)}${band.lo.map((_v, i) => `L${sx(band.lo.length - 1 - i).toFixed(1)},${sy(band.lo[band.lo.length - 1 - i]).toFixed(1)}`).join('')}Z` : ''
   return (
     <div className="relative" data-testid={testId}>
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" onMouseLeave={() => setHover(null)} onMouseMove={(e) => {
@@ -45,10 +46,12 @@ export function LineChart({ x, lines, band, height = 220, testId, format = (v: n
         const i = Math.round(((e.clientX - r.left) / r.width) * (x.length - 1))
         setHover(Math.max(0, Math.min(x.length - 1, i)))
       }} role="img">
-        {band && <path d={`${path(band.hi)}${band.lo.map((_v, i) => `L${sx(band.lo.length - 1 - i).toFixed(1)},${sy(band.lo[band.lo.length - 1 - i]).toFixed(1)}`).join('')}Z`} fill={band.color} opacity={0.25} />}
-        {lines.map((l, k) => (
-          <path key={k} d={path(l.values)} fill="none" stroke={l.color} strokeWidth={l.width ?? 2} strokeDasharray={l.dash} />
-        ))}
+        {band && bandD.startsWith('M') && <path d={bandD} fill={band.color} opacity={0.25} />}
+        {lines.map((l, k) => {
+          const d = path(l.values)
+          // a line with no points yet (e.g. an animation at its start) is not drawn at all
+          return d ? <path key={k} d={d} fill="none" stroke={l.color} strokeWidth={l.width ?? 2} strokeDasharray={l.dash} /> : null
+        })}
         {ticks.map((i) => (
           <text key={i} x={sx(i)} y={H - 6} fontSize="11" fill="#78716c" textAnchor={i === 0 ? 'start' : i === x.length - 1 ? 'end' : 'middle'}>
             {x[i]}
@@ -127,15 +130,28 @@ export function Gauge({ value, label, sub, testId, size = 220 }: { value: number
   )
 }
 
-/** Radar chart for 0–100 scores, grows in on mount. */
+/** Radar chart for 0–100 scores, grows in on mount. Labels sit outside the web, anchored away from it, and the
+ * drawing area widens to fit the longest label (German labels are long), so no label is ever cut off. */
 export function Radar({ axes, testId }: { axes: { label: string; value: number }[]; testId?: string }) {
   const n = axes.length
   const pt = (i: number, r: number) => {
     const a = -Math.PI / 2 + (2 * Math.PI * i) / n
     return `${(110 + r * Math.cos(a)).toFixed(1)},${(110 + r * Math.sin(a)).toFixed(1)}`
   }
+  const labels = axes.map((a, i) => {
+    const ang = -Math.PI / 2 + (2 * Math.PI * i) / n
+    const c = Math.cos(ang)
+    const x = 110 + 90 * c
+    const y = 110 + 92 * Math.sin(ang)
+    const anchor: 'start' | 'middle' | 'end' = c > 0.3 ? 'start' : c < -0.3 ? 'end' : 'middle'
+    const w = a.label.length * 6 // generous width estimate at font size 10
+    const left = anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2
+    return { label: a.label, x, y, anchor, left, right: left + w }
+  })
+  const minX = Math.floor(Math.min(0, ...labels.map((l) => l.left)) - 4)
+  const maxX = Math.ceil(Math.max(220, ...labels.map((l) => l.right)) + 4)
   return (
-    <svg viewBox="0 0 220 220" className="h-auto w-full max-w-xs" data-testid={testId} role="img">
+    <svg viewBox={`${minX} 0 ${maxX - minX} 220`} className="h-auto w-full max-w-sm" data-testid={testId} role="img">
       {[0.25, 0.5, 0.75, 1].map((k) => (
         <polygon key={k} points={axes.map((_, i) => pt(i, 80 * k)).join(' ')} fill="none" stroke="#e7e5e4" />
       ))}
@@ -143,14 +159,11 @@ export function Radar({ axes, testId }: { axes: { label: string; value: number }
         <line key={i} x1="110" y1="110" x2={pt(i, 80).split(',')[0]} y2={pt(i, 80).split(',')[1]} stroke="#e7e5e4" />
       ))}
       <polygon points={axes.map((a, i) => pt(i, (80 * Math.max(0, Math.min(100, a.value))) / 100)).join(' ')} fill="#16595a" fillOpacity="0.35" stroke="#0f3d3e" strokeWidth="2" className="radar-grow" />
-      {axes.map((a, i) => {
-        const [x, y] = pt(i, 100).split(',').map(Number)
-        return (
-          <text key={a.label} x={x} y={y} fontSize="10" textAnchor="middle" dominantBaseline="middle" fill="#44403c">
-            {a.label}
-          </text>
-        )
-      })}
+      {labels.map((l, i) => (
+        <text key={i} x={l.x.toFixed(1)} y={l.y.toFixed(1)} fontSize="10" textAnchor={l.anchor} dominantBaseline="middle" fill="#44403c">
+          {l.label}
+        </text>
+      ))}
     </svg>
   )
 }
