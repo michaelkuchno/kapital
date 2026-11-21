@@ -32,7 +32,7 @@ export function Bonds() {
           🇨🇭 {t('bonds.chNote')}
         </p>
       )}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="offer">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="offer">
         {offer.map((o) => (
           <div key={o.code} className="card" data-testid={`offer-${o.code}`}>
             <div className="flex items-baseline gap-2">
@@ -47,7 +47,7 @@ export function Bonds() {
       </div>
       {market?.offerMonth && <p className="text-xs text-stone-500">{t('bonds.offerSource', { month: market.offerMonth })}</p>}
       <Card title={t('bonds.compare')} testId="bond-compare">
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
           <Field label={`${t('bonds.amount')} (PLN)`}>
             <Num value={amount} onChange={setAmount} testId="c-amount" />
           </Field>

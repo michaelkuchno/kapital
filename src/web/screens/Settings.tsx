@@ -125,7 +125,7 @@ export function Settings() {
       <People />
       <Card title={t('country.title')} testId="country">
         <p className="mb-3 text-sm text-stone-600">{t('country.hint')}</p>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('country.title')}>
             <select className="input" value={settings.country} onChange={(e) => void update({ country: e.target.value as 'PL' | 'CH', displayCurrency: e.target.value === 'CH' ? 'CHF' : 'PLN' })} data-testid="s-country">
               <option value="PL">{t('country.PL')}</option>
@@ -141,7 +141,7 @@ export function Settings() {
         </div>
       </Card>
       <Card>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('settings.lang')}>
             <select className="input" value={settings.lang} onChange={(e) => void update({ lang: e.target.value as Lang })} data-testid="s-lang">
               {LANGS.map((l) => (

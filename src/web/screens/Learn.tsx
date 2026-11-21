@@ -35,11 +35,11 @@ function Lesson({ id, title, lead, children, years, setYears, max, label }: { id
       <p className="mb-3 text-sm leading-relaxed text-stone-700">{lead}</p>
       {children}
       <div className="mt-3 flex items-center gap-3">
-        <button type="button" className="btn-primary !py-1" onClick={() => (setYears(0), setTimeout(play, 50))} data-testid={`play-${id}`}>
+        <button type="button" className="btn-primary shrink-0 !py-1" onClick={() => (setYears(0), setTimeout(play, 50))} data-testid={`play-${id}`}>
           ▶ {t('learn.play')}
         </button>
-        <input type="range" min={0} max={max} value={years} onChange={(e) => setYears(Number(e.target.value))} className="flex-1 accent-[#0f3d3e]" aria-label={label} data-testid={`slider-${id}`} />
-        <span className="num w-20 text-right text-sm font-semibold">{label}</span>
+        <input type="range" min={0} max={max} value={years} onChange={(e) => setYears(Number(e.target.value))} className="min-w-0 flex-1 accent-[#0f3d3e]" aria-label={label} data-testid={`slider-${id}`} />
+        <span className="num min-w-[3.5rem] shrink-0 whitespace-nowrap text-right text-sm font-semibold">{label}</span>
       </div>
     </Card>
   )
@@ -218,7 +218,7 @@ export function Learn() {
     <div className="space-y-4" data-testid="learn">
       <h1 className="text-2xl font-extrabold text-sea">{t('nav.learn')}</h1>
       <p className="text-sm text-stone-600">{t('learn.intro')}</p>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Compound />
         <Inflation />
         <Edo />

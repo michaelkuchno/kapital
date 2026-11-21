@@ -261,7 +261,7 @@ export function Advisor() {
               <Field label={t('country.title')}>
                 <Choice value={st.residence} onChange={(v) => set({ residence: v, currency: v === 'CH' ? 'CHF' : 'PLN', cashCurrency: v === 'CH' ? 'CHF' : 'PLN' })} options={[{ v: 'PL', label: t('country.PL') }, { v: 'CH', label: t('country.CH') }, { v: 'other', label: t('adv.otherCountry'), icon: '🌍' }]} testId="adv-residence" />
               </Field>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label={t('adv.adults')}>
                   <Num value={st.adults} onChange={(v) => set({ adults: v })} testId="adv-adults" />
                 </Field>
@@ -293,7 +293,7 @@ export function Advisor() {
               <Field label={t('adv.currency')}>
                 <Choice value={st.currency} onChange={(v) => set({ currency: v })} options={[{ v: 'PLN', label: 'PLN (zł)' }, { v: 'CHF', label: 'CHF (Fr.)' }]} testId="adv-currency" />
               </Field>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label={`${t('adv.income')} (${ccy(st.currency)})`}>
                   <Num value={st.monthlyIncome} onChange={(v) => set({ monthlyIncome: v })} testId="adv-income" />
                 </Field>
@@ -316,7 +316,7 @@ export function Advisor() {
           )}
           {STEPS[step] === 'now' && (
             <Step title={t('adv.now.title')} lead={t('adv.now.lead')}>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label={t('adv.cash')}>
                   <Num value={st.cash} onChange={(v) => set({ cash: v })} testId="adv-cash" />
                 </Field>
@@ -433,13 +433,13 @@ export function Advisor() {
         </Card>
       )}
 
-      <div className="grid gap-3 lg:grid-cols-2" data-testid="plan-items">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2" data-testid="plan-items">
         {plan.items.map((it) => (
           <ProductCard key={it.id} item={it} residence={input!.residence} />
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title={t('plan.market')} testId="plan-market">
           <div className="flex flex-wrap justify-around gap-2">
             {pl && <Gauge value={pl.score} label={t('fg.pl')} sub={t(`mood.${pl.mood}`)} size={170} testId="plan-gauge-pl" />}
@@ -470,7 +470,7 @@ export function Advisor() {
         </p>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title={t('plan.stress')} testId="plan-stress">
           <p className="text-sm">{t('plan.stressText', { loss: fmt(plan.stress.crashLoss), pct: Math.round(plan.stress.crashPct * 100), years: plan.stress.recoveryYears })}</p>
           <div className="mt-3 h-4 rounded bg-stone-100">

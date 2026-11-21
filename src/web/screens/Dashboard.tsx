@@ -58,7 +58,7 @@ export function Dashboard() {
         </Stat>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card title={t('allocation')} testId="allocation">
           <div className="flex items-center gap-4">
             <Donut parts={(Object.keys(s.byClass) as AssetClass[]).map((c) => ({ label: c, value: s.byClass[c], color: CLASS_COLORS[c] }))} size={140} testId="donut" />
@@ -135,7 +135,7 @@ export function Dashboard() {
         )}
       </Card>
       <Card title={t('topInsights')} testId="top-insights" action={<button type="button" className="text-sm font-semibold text-sea-2 underline" onClick={() => go('insights')}>{t('allInsights')} →</button>}>
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {insights.slice(0, 4).map((i) => (
             <InsightCard key={i.id} i={i} />
           ))}

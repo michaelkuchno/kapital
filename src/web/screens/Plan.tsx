@@ -90,7 +90,7 @@ export function Plan() {
         <p className="mt-1 text-xs text-stone-500">{t('plan.assumptions', { eq: DEFAULT_PARAMS.equityReal, vol: DEFAULT_PARAMS.equityVol, dep: DEFAULT_PARAMS.depositSpread, m: DEFAULT_PARAMS.inflationMargin })}</p>
       </Card>
       <Card title={t('plan.goal')} testId="goal">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Field label={`${t('plan.goalAmount')} (${cur})`}>
             <Num value={goal} onChange={setGoal} testId="g-amount" />
           </Field>
