@@ -1,6 +1,8 @@
 {
- "updatedAt": "2026-11-27T01:31:23.844Z",
- "lastTradingDay": "2026-11-26",
- "errors": [],
+ "updatedAt": "2026-11-28T01:07:18.811Z",
+ "lastTradingDay": "2026-11-27",
+ "errors": [
+  "knf: fetch failed"
+ ],
  "files": 21
 }
